@@ -1,0 +1,24 @@
+# =============================================================================
+# Frontend — development image
+#
+# Used by docker-compose.dev.yml. Boots `next dev` with hot reload, sources
+# bind-mounted from the host, deps installed inside the container.
+#
+# Production image (multi-stage with `next build && next start`) lands in a
+# later phase once the build pipeline stabilises.
+# =============================================================================
+
+FROM node:20-alpine
+
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+
+# Install deps first so the layer caches independently of source.
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

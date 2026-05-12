@@ -1,0 +1,1209 @@
+openapi: 3.0.3
+info:
+  title: NebulaCloud API
+  version: "0.0.1"
+  description: |
+    NebulaCloud is a self-hosted PaaS in the spirit of Railway, Render, Heroku
+    and Vercel. This document describes the public REST + WebSocket surface
+    consumed by the dashboard and by automation clients.
+
+    Phase 0 shipped health and meta. Phase 1 adds Identity. Phase 2 adds
+    organizations, projects, services, environment variables, deployments,
+    GitHub webhooks, and scaffolded logs/metrics queries for the dashboard.
+
+    Subsequent phases will deepen Domains, streaming logs, and richer metrics.
+
+  contact:
+    name: NebulaCloud
+    url: https://github.com/nebulacloud/nebula
+
+servers:
+  - url: http://api.nebula.localhost
+    description: local development
+  - url: https://api.example.com
+    description: production (replace with your domain)
+
+tags:
+  - name: Meta
+    description: Service metadata and health endpoints.
+  - name: Identity
+    description: Authentication and user management. (Phase 1)
+  - name: Projects
+    description: Workspaces, projects and services. (Phase 2)
+  - name: Deployments
+    description: Build and runtime lifecycle. (Phase 4–5)
+  - name: Logs
+    description: Realtime log streaming. (Phase 6)
+  - name: Metrics
+    description: Container and platform metrics. (Phase 6)
+
+  - name: Webhooks
+    description: Inbound provider webhooks (GitHub push, etc.).
+
+paths:
+  /healthz:
+    get:
+      tags: [Meta]
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /readyz:
+    get:
+      tags: [Meta]
+      summary: Readiness probe (includes downstream dependencies)
+      responses:
+        "200":
+          description: All registered checks pass.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          description: At least one downstream is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+
+  /api/v1/:
+    get:
+      tags: [Meta]
+      summary: Service banner
+      responses:
+        "200":
+          description: Static information about the running build.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+
+  /api/v1/auth/register:
+    post:
+      tags: [Identity]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+                display_name: { type: string }
+      responses:
+        "201":
+          description: User created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "409":
+          description: Email already registered.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation failure.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Identity]
+      summary: Authenticate and receive a token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Token pair.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPairEnvelope" }
+        "401":
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Identity]
+      summary: Rotate a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: New token pair.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPairEnvelope" }
+        "401":
+          description: Token expired, revoked, or invalid.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Identity]
+      summary: Revoke a refresh token
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "204":
+          description: Logged out (idempotent).
+
+  /api/v1/auth/github:
+    get:
+      tags: [Identity]
+      summary: Start GitHub OAuth (Phase 3 placeholder)
+      description: Returns 501 until the GitHub App user flow is implemented.
+      responses:
+        "501":
+          description: Not implemented.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+
+  /api/v1/auth/github/callback:
+    get:
+      tags: [Identity]
+      summary: GitHub OAuth callback (Phase 3 placeholder)
+      responses:
+        "501":
+          description: Not implemented.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+
+  /api/v1/me:
+    get:
+      tags: [Identity]
+      summary: Return the authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: The current user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/github:
+    post:
+      tags: [Webhooks]
+      operationId: githubWebhook
+      summary: GitHub push webhook (HMAC optional in dev)
+      description: |
+        Accepts GitHub `push` and `ping` events. When `X-GitHub-Event` is
+        something else, responds with `{data:{status:"ignored"}}`. Signature
+        enforced when `X-Hub-Signature-256` matches the configured secret.
+        Push payloads may include `installation.id`; when present and the
+        project has `github_installation_id` set, only matching projects are
+        deployed (otherwise URL + default-branch matching applies as in dev).
+      parameters:
+        - name: X-GitHub-Event
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: X-Hub-Signature-256
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Processed or ignored event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+        "204":
+          description: Ping acknowledged.
+        "401":
+          description: Bad or missing webhook signature when secret is enforced.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Invalid JSON or payload.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/organizations:
+    get:
+      tags: [Projects]
+      operationId: listOrganizations
+      summary: List organizations for the current user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Organizations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Organization" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Projects]
+      operationId: createOrganization
+      summary: Create an organization
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Organization" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Conflict.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/organizations/{orgID}/projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: List projects in an organization
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orgID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Projects.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Project" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orgID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+                description: { type: string }
+                repo_url: { type: string }
+                default_branch: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Project" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/projects/{projectID}:
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: Get a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Project.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Project" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    patch:
+      tags: [Projects]
+      operationId: patchProject
+      summary: Update project metadata (repo branch, URL, etc.)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+                repo_url: { type: string, nullable: true }
+                default_branch: { type: string }
+      responses:
+        "200":
+          description: Updated project.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Project" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/integrations/github/installation:
+    post:
+      tags: [Projects]
+      operationId: linkGithubInstallationStub
+      summary: Link GitHub App installation (Phase 3 placeholder)
+      description: Reserved for a verified GitHub App callback; returns 501 today.
+      security:
+        - BearerAuth: []
+      responses:
+        "501":
+          description: Not implemented.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/projects/{projectID}/services:
+    get:
+      tags: [Projects]
+      operationId: listServices
+      summary: List services for a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Services.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Service" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Projects]
+      operationId: createService
+      summary: Create a service under a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name]
+              properties:
+                slug: { type: string }
+                name: { type: string }
+                type: { type: string }
+      responses:
+        "201":
+          description: Created service.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Service" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/projects/{projectID}/deployments:
+    get:
+      tags: [Deployments]
+      operationId: listDeploymentsByProject
+      summary: List deployments for every service in a project
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Deployments (newest first).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Deployment" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}:
+    get:
+      tags: [Projects]
+      operationId: getService
+      summary: Get a single service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Service.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Service" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    patch:
+      tags: [Projects]
+      operationId: patchService
+      summary: Update service runtime/build JSON blobs or display name
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                build_config: { type: object, additionalProperties: true }
+                runtime_config: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Updated service.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Service" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}/env-vars:
+    get:
+      tags: [Projects]
+      operationId: listEnvVars
+      summary: List environment variables (secrets show masked previews)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Env vars.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/EnvVar" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Projects]
+      operationId: upsertEnvVar
+      summary: Create or update an environment variable
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value]
+              properties:
+                key: { type: string }
+                value: { type: string }
+                is_secret: { type: boolean }
+      responses:
+        "201":
+          description: Created/updated env var.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/EnvVar" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}/env-vars/{envKey}:
+    delete:
+      tags: [Projects]
+      operationId: deleteEnvVar
+      summary: Delete an environment variable by key
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: envKey
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}/deployments:
+    get:
+      tags: [Deployments]
+      operationId: listDeploymentsForService
+      summary: List deployments for one service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Deployments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Deployment" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Deployments]
+      operationId: createDeployment
+      summary: Enqueue a build/deploy pipeline for this service (manual deploy)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: Deployment queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/DeployQueued" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}/logs:
+    get:
+      tags: [Logs]
+      operationId: serviceLogs
+      summary: Recent log lines from Loki (by service UUID label)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: window
+          in: query
+          description: Lookback duration (Go duration string).
+          schema:
+            type: string
+            example: "15m"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+      responses:
+        "200":
+          description: Log rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/LogLine" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}/metrics:
+    get:
+      tags: [Metrics]
+      operationId: serviceMetrics
+      summary: Prometheus range samples scaffolded per service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: window
+          in: query
+          description: Lookback duration (Go duration string).
+          schema:
+            type: string
+            example: "1h"
+      responses:
+        "200":
+          description: Metric series for charts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MetricSeries" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/deployments/{deploymentID}:
+    get:
+      tags: [Deployments]
+      operationId: getDeployment
+      summary: Get one deployment joined with project/service labels
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Deployment.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Deployment" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Health:
+      type: object
+      required: [status, version, time]
+      properties:
+        status: { type: string, example: ok }
+        version: { type: string, example: dev }
+        time: { type: string, format: date-time }
+
+    Readiness:
+      allOf:
+        - $ref: "#/components/schemas/Health"
+        - type: object
+          properties:
+            checks:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  status: { type: string, enum: [ok, down] }
+                  error: { type: string }
+
+    Envelope:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+        meta:
+          type: object
+          additionalProperties: true
+
+    User:
+      type: object
+      required: [id, email, is_admin, email_verified, mfa_enabled, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        avatar_url: { type: string, format: uri }
+        is_admin: { type: boolean }
+        email_verified: { type: boolean }
+        mfa_enabled: { type: boolean }
+        last_login_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    UserEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/User" }
+
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, access_expiry, refresh_expiry, token_type, user]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        access_expiry: { type: string, format: date-time }
+        refresh_expiry: { type: string, format: date-time }
+        token_type: { type: string, example: Bearer }
+        user: { $ref: "#/components/schemas/User" }
+
+    TokenPairEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/TokenPair" }
+
+    Organization:
+      type: object
+      required: [id, slug, name, plan, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        plan: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Project:
+      type: object
+      required: [id, organization_id, slug, name, default_branch, services_count, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        organization_id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string }
+        repo_url: { type: string }
+        default_branch: { type: string }
+        services_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Service:
+      type: object
+      required: [id, project_id, slug, name, type, status, replicas, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        type: { type: string }
+        status: { type: string }
+        current_image: { type: string }
+        url: { type: string, format: uri }
+        replicas: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EnvVar:
+      type: object
+      required: [id, key, is_secret, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        is_secret: { type: boolean }
+        preview: { type: string }
+        updated_at: { type: string, format: date-time }
+
+    DeploymentActor:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+
+    Deployment:
+      type: object
+      required: [id, service_id, service_name, project_id, project_name, trigger, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        service_name: { type: string }
+        project_id: { type: string, format: uuid }
+        project_name: { type: string }
+        trigger: { type: string }
+        status: { type: string }
+        commit_sha: { type: string }
+        commit_message: { type: string }
+        ref: { type: string }
+        image_ref: { type: string }
+        duration_ms: { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        triggered_by: { $ref: "#/components/schemas/DeploymentActor" }
+
+    DeployQueued:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string }
+
+    LogLine:
+      type: object
+      required: [ts, message]
+      properties:
+        ts: { type: string }
+        level: { type: string }
+        service: { type: string }
+        message: { type: string }
+        correlation_id: { type: string }
+
+    MetricPoint:
+      type: object
+      required: [ts, value]
+      properties:
+        ts: { type: integer, format: int64 }
+        value: { type: number, format: double }
+
+    MetricSeries:
+      type: object
+      required: [name, unit, points]
+      properties:
+        name: { type: string }
+        unit: { type: string }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/MetricPoint" }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [kind, message]
+          properties:
+            kind:
+              type: string
+              enum:
+                - validation
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - rate_limited
+                - unavailable
+                - internal
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties: { type: string }

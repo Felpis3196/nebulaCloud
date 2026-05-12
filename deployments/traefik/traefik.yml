@@ -1,0 +1,62 @@
+# ============================================================================
+# Traefik static configuration
+# Dynamic file is mounted at /etc/traefik/dynamic/dynamic.yml.
+# ============================================================================
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  insecure: true # dev only — locked down by host rule in compose
+
+ping:
+  entryPoint: web
+
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+        X-Request-Id: keep
+
+entryPoints:
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: nebula_platform
+    watch: true
+  file:
+    filename: /etc/traefik/dynamic/dynamic.yml
+    watch: true
+
+# ACME (Let's Encrypt) — configured but unused in local dev.
+# In production set NEBULA_ACME_EMAIL and switch to a real DNS challenge.
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@nebula.localhost
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    entryPoint: web

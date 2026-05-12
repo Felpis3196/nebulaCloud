@@ -1,0 +1,45 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - gocritic
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - unconvert
+    - whitespace
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/nebulacloud/nebula
+  revive:
+    rules:
+      - name: var-naming
+      - name: exported
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: increment-decrement
+      - name: unused-parameter
+        disabled: true # too noisy at this stage
+
+issues:
+  exclude-dirs:
+    - vendor
+    - test/fixtures
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gocritic

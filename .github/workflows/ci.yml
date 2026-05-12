@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.23"
+
+jobs:
+  # ==========================================================================
+  # Backend
+  # ==========================================================================
+  backend-lint:
+    name: backend / lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.0
+          working-directory: backend
+          args: --timeout=5m
+
+  backend-test:
+    name: backend / test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nebula
+          POSTGRES_PASSWORD: nebula
+          POSTGRES_DB: nebula_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nebula"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NEBULA_ENV: development
+      NEBULA_JWT_SECRET: ci-jwt-secret-do-not-use-in-prod
+      NEBULA_PASSWORD_PEPPER: ci-pepper-do-not-use
+      NEBULA_SECRETS_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: nebula
+      POSTGRES_PASSWORD: nebula
+      POSTGRES_DB: nebula_test
+      REDIS_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - run: go mod download
+      - name: Test (race)
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -n 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.out
+
+  backend-build:
+    name: backend / build images
+    runs-on: ubuntu-latest
+    needs: [backend-lint, backend-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build api image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: api
+          push: false
+          tags: nebula/api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build build-worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: build-worker
+          push: false
+          tags: nebula/build-worker:ci
+          cache-from: type=gha
+      - name: Build runtime-agent image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: runtime-agent
+          push: false
+          tags: nebula/runtime-agent:ci
+          cache-from: type=gha
+
+  # ==========================================================================
+  # Frontend (skipped until package.json exists)
+  # ==========================================================================
+  frontend-lint:
+    name: frontend / lint
+    runs-on: ubuntu-latest
+    if: hashFiles('frontend/package.json') != ''
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+      - run: npm run lint
+      - run: npm run typecheck
+
+  # ==========================================================================
+  # OpenAPI lint
+  # ==========================================================================
+  openapi:
+    name: contract / openapi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Spectral
+        run: npm install -g @stoplight/spectral-cli@6
+      - name: Lint OpenAPI
+        run: spectral lint backend/api/openapi.yaml --ruleset=spectral:oas

@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   NebulaCloud — design tokens
+   Dark-first. Light theme exposed for contrast / future preference.
+   Base palette: zinc.  Primary: indigo.  Accent: violet/fuchsia.
+============================================================================ */
+
+@layer base {
+  :root {
+    /* Light theme (rarely used, kept for accessibility parity) */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 290 80% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 76% 44%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 239 84% 67%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    /* Dark — primary product surface */
+    --background: 240 10% 4%;     /* zinc-950ish */
+    --foreground: 0 0% 98%;
+    --card: 240 6% 7%;            /* card slightly lifted */
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 7%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 239 84% 67%;       /* indigo-500 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 14%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 5% 11%;
+    --muted-foreground: 240 5% 64%;
+
+    --accent: 290 80% 65%;        /* violet-fuchsia accent */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 76% 44%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 240 10% 4%;
+
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 240 5% 14%;
+    --input: 240 5% 14%;
+    --ring: 239 84% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+  body {
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background-color: hsl(var(--primary) / 0.35);
+    color: hsl(var(--foreground));
+  }
+
+  /* Scrollbars — subtle, only visible on hover within a container */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      120deg,
+      hsl(0 0% 98%) 0%,
+      hsl(239 84% 80%) 35%,
+      hsl(290 80% 75%) 65%,
+      hsl(330 90% 75%) 100%
+    );
+  }
+
+  .gradient-primary {
+    background: linear-gradient(
+      120deg,
+      hsl(239 84% 60%) 0%,
+      hsl(265 85% 62%) 50%,
+      hsl(305 80% 62%) 100%
+    );
+  }
+
+  .gradient-primary-soft {
+    background: linear-gradient(
+      120deg,
+      hsl(239 84% 60% / 0.18) 0%,
+      hsl(265 85% 62% / 0.14) 50%,
+      hsl(305 80% 62% / 0.18) 100%
+    );
+  }
+
+  .glass {
+    @apply bg-card/60 backdrop-blur-xl;
+  }
+
+  .ring-soft {
+    box-shadow:
+      0 0 0 1px hsl(var(--border)),
+      0 1px 2px 0 hsl(0 0% 0% / 0.06);
+  }
+
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  }
+
+  .mask-fade-t {
+    -webkit-mask-image: linear-gradient(to top, black 60%, transparent 100%);
+    mask-image: linear-gradient(to top, black 60%, transparent 100%);
+  }
+
+  /* Reduce motion globally if user prefers */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

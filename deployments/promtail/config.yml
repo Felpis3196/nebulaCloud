@@ -1,0 +1,61 @@
+# ============================================================================
+# Promtail — tails Docker container logs and ships them to Loki, enriched
+# with NebulaCloud labels.
+# ============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # All Docker containers — labels enriched from container metadata.
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.*)
+        target_label: container
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: compose_service
+      - source_labels: [__meta_docker_container_label_com_docker_compose_project]
+        target_label: compose_project
+      - source_labels: [__meta_docker_container_label_nebula_org]
+        target_label: org
+      - source_labels: [__meta_docker_container_label_nebula_project]
+        target_label: project
+      - source_labels: [__meta_docker_container_label_nebula_service]
+        target_label: service
+      - source_labels: [__meta_docker_container_label_nebula_deployment_id]
+        target_label: deployment_id
+      - source_labels: [__meta_docker_container_label_nebula_role]
+        regex: (.+)
+        target_label: nebula_role
+        replacement: ${1}
+    pipeline_stages:
+      - cri: {}
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            ts: time
+            correlation_id: correlation_id
+            user_id: user_id
+            org_id: org_id
+            trace_id: trace_id
+      - labels:
+          level:
+          correlation_id:
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+          fallback_formats:
+            - RFC3339

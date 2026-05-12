@@ -1,0 +1,76 @@
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+acme.json
+
+# Go
+backend/bin/
+backend/dist/
+backend/coverage.out
+backend/coverage.html
+backend/vendor/
+*.test
+*.out
+__debug_bin*
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.pnpm-store/
+.turbo/
+.cache/
+*.tsbuildinfo
+next-env.d.ts
+
+# Build artifacts
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Docker volumes (when using bind mounts)
+data/
+volumes/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Local Traefik / Grafana / Loki state
+deployments/traefik/acme.json
+deployments/grafana/data/
+deployments/loki/data/
+deployments/prometheus/data/
+
+# Plan / scratch
+.scratch/

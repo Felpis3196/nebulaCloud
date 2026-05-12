@@ -1,0 +1,48 @@
+# ============================================================================
+# Prometheus scrape configuration
+# ============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    platform: nebula
+    environment: development
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: traefik
+    static_configs:
+      - targets: ["traefik:8080"]
+    metrics_path: /metrics
+
+  # Control plane API exposes /metrics on port 9100 (NEBULA_METRICS_PORT)
+  - job_name: nebula-api
+    static_configs:
+      - targets: ["api:9100"]
+        labels:
+          service: nebula-api
+          component: control-plane
+
+  # Build worker (added in Phase 4)
+  - job_name: nebula-build-worker
+    static_configs:
+      - targets: ["build-worker:9100"]
+        labels:
+          service: nebula-build-worker
+          component: worker
+    relabel_configs:
+      # Marks the target as down silently while the service is not yet running.
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Runtime agent (added in Phase 5)
+  - job_name: nebula-runtime-agent
+    static_configs:
+      - targets: ["runtime-agent:9100"]
+        labels:
+          service: nebula-runtime-agent
+          component: agent
