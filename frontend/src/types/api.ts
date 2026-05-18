@@ -84,6 +84,8 @@ export interface Project {
   description?: string;
   repo_url?: string;
   default_branch: string;
+  /** GitHub App installation id when linked (webhook matching). */
+  github_installation_id?: number;
   services_count: number;
   created_at: string;
   updated_at: string;

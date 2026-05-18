@@ -510,27 +510,64 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
-  /api/v1/integrations/github/installation:
+  /api/v1/projects/{projectID}/github-installation:
     post:
       tags: [Projects]
-      operationId: linkGithubInstallationStub
-      summary: Link GitHub App installation (Phase 3 placeholder)
-      description: Reserved for a verified GitHub App callback; returns 501 today.
+      operationId: linkGithubInstallation
+      summary: Link GitHub App installation to a project
+      description: |
+        Persists `github_installation_id` on the project so push webhooks that
+        include `installation.id` only match this project (avoids fork URL collisions).
+        The installation id comes from the GitHub App after install (Settings URL
+        or API); a future OAuth callback may call this automatically.
       security:
         - BearerAuth: []
+      parameters:
+        - name: projectID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [installation_id]
+              properties:
+                installation_id:
+                  type: integer
+                  format: int64
+                  minimum: 1
       responses:
-        "501":
-          description: Not implemented.
+        "200":
+          description: Updated project.
           content:
             application/json:
               schema:
                 type: object
+                required: [data]
                 properties:
-                  data:
-                    type: object
-                    additionalProperties: true
+                  data: { $ref: "#/components/schemas/Project" }
         "401":
           description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: Forbidden.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Project not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1093,6 +1130,7 @@ components:
         description: { type: string }
         repo_url: { type: string }
         default_branch: { type: string }
+        github_installation_id: { type: integer, format: int64 }
         services_count: { type: integer }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

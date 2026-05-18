@@ -22,55 +22,54 @@ import { Badge } from "@/components/ui/badge";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { relativeTime } from "@/lib/utils";
 import type { Domain } from "@/types/api";
+import { useTranslations } from "next-intl";
 
 export function DomainsTable({ domains }: { domains: Domain[] }) {
+  const t = useTranslations("domains");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <CardTitle>Custom domains</CardTitle>
-          <CardDescription>
-            NebulaCloud provisions Let's Encrypt certificates and renews them automatically.
-          </CardDescription>
+          <CardTitle>{t("cardTitle")}</CardTitle>
+          <CardDescription>{t("cardDesc")}</CardDescription>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" variant="gradient">
-              <Plus /> Add domain
+              <Plus /> {t("addDomain")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add a custom domain</DialogTitle>
-              <DialogDescription>
-                Point your domain to NebulaCloud and we'll handle the rest. Backend lands in Phase 7.
-              </DialogDescription>
+              <DialogTitle>{t("dialogTitle")}</DialogTitle>
+              <DialogDescription>{t("dialogDesc")}</DialogDescription>
             </DialogHeader>
             <form
               className="space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 setOpen(false);
-                toast.success("Domain queued for verification.");
+                toast.success(t("verifyQueued"));
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor="hostname">Hostname</Label>
+                <Label htmlFor="hostname">{t("hostname")}</Label>
                 <Input id="hostname" placeholder="app.acme.com" required />
               </div>
               <div className="rounded-md border border-border/60 bg-secondary/40 px-3 py-2 font-mono text-xs text-muted-foreground">
-                CNAME app.acme.com → <span className="text-foreground">edge.nebula.app</span>
+                {t("cnameHint")}
               </div>
               <DialogFooter>
                 <DialogClose asChild>
                   <Button type="button" variant="outline">
-                    Cancel
+                    {tCommon("cancel")}
                   </Button>
                 </DialogClose>
                 <Button type="submit" variant="gradient">
-                  Add domain
+                  {t("addDomain")}
                 </Button>
               </DialogFooter>
             </form>
@@ -81,10 +80,10 @@ export function DomainsTable({ domains }: { domains: Domain[] }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Hostname</TableHead>
-              <TableHead>Service</TableHead>
-              <TableHead>SSL</TableHead>
-              <TableHead>Last verified</TableHead>
+              <TableHead>{t("hostnameCol")}</TableHead>
+              <TableHead>{t("serviceCol")}</TableHead>
+              <TableHead>{t("sslCol")}</TableHead>
+              <TableHead>{t("lastVerified")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -97,7 +96,7 @@ export function DomainsTable({ domains }: { domains: Domain[] }) {
                     <span className="font-medium">{d.hostname}</span>
                     {d.is_primary && (
                       <Badge variant="muted" className="text-[10px]">
-                        primary
+                        {t("primary")}
                       </Badge>
                     )}
                   </div>
@@ -111,7 +110,7 @@ export function DomainsTable({ domains }: { domains: Domain[] }) {
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm">
-                    Manage
+                    {t("manage")}
                   </Button>
                 </TableCell>
               </TableRow>

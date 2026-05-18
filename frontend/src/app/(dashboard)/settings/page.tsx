@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Copy, KeyRound, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,10 @@ const MOCK_KEYS = [
 ];
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
+  const tAuth = useTranslations("auth");
+  const tCommon = useTranslations("common");
+  const tTheme = useTranslations("theme");
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [mfa, setMfa] = useState(user?.mfa_enabled ?? false);
@@ -37,25 +42,27 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your profile, security, API keys, and dashboard appearance.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </header>
+
+      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{t("placeholderBanner")}</span> {t("placeholderText")}
+      </div>
 
       <Tabs defaultValue="profile">
         <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="keys">API keys</TabsTrigger>
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
+          <TabsTrigger value="profile">{t("tabs.profile")}</TabsTrigger>
+          <TabsTrigger value="security">{t("tabs.security")}</TabsTrigger>
+          <TabsTrigger value="keys">{t("tabs.keys")}</TabsTrigger>
+          <TabsTrigger value="appearance">{t("tabs.appearance")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Profile</CardTitle>
-              <CardDescription>How you appear inside NebulaCloud.</CardDescription>
+              <CardTitle>{t("profile.title")}</CardTitle>
+              <CardDescription>{t("profile.description")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
@@ -67,27 +74,27 @@ export default function SettingsPage() {
                 </Avatar>
                 <div className="space-y-1">
                   <p className="text-sm font-medium">
-                    {user?.display_name ?? "Operator"}
+                    {user?.display_name ?? tCommon("operator")}
                   </p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <Button variant="outline" size="sm" className="ml-auto">
-                  Upload
+                  {tCommon("upload")}
                 </Button>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="displayName">Display name</Label>
+                  <Label htmlFor="displayName">{t("profile.displayName")}</Label>
                   <Input id="displayName" defaultValue={user?.display_name ?? ""} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{tAuth("email")}</Label>
                   <Input id="email" type="email" defaultValue={user?.email ?? ""} />
                 </div>
               </div>
               <div className="flex justify-end">
                 <Button variant="gradient" size="sm">
-                  Save profile
+                  {t("profile.saveProfile")}
                 </Button>
               </div>
             </CardContent>
@@ -97,29 +104,27 @@ export default function SettingsPage() {
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Change password</CardTitle>
-              <CardDescription>
-                Argon2id hashed server-side, with rotation logged in your audit trail.
-              </CardDescription>
+              <CardTitle>{t("security.changePassword")}</CardTitle>
+              <CardDescription>{t("security.changePasswordDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="current">Current</Label>
+                  <Label htmlFor="current">{t("security.current")}</Label>
                   <Input id="current" type="password" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new">New</Label>
+                  <Label htmlFor="new">{t("security.new")}</Label>
                   <Input id="new" type="password" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm">Confirm</Label>
+                  <Label htmlFor="confirm">{t("security.confirm")}</Label>
                   <Input id="confirm" type="password" />
                 </div>
               </div>
               <div className="flex justify-end">
                 <Button size="sm" variant="gradient">
-                  Update password
+                  {t("security.updatePassword")}
                 </Button>
               </div>
             </CardContent>
@@ -129,28 +134,26 @@ export default function SettingsPage() {
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  Two-factor authentication
-                  {mfa && <Badge variant="success">enabled</Badge>}
+                  {t("security.mfa")}
+                  {mfa && <Badge variant="success">{tCommon("enabled")}</Badge>}
                 </CardTitle>
-                <CardDescription>
-                  Time-based one-time passwords. Phase 9 ships hardware key support.
-                </CardDescription>
+                <CardDescription>{t("security.mfaDesc")}</CardDescription>
               </div>
-              <Switch checked={mfa} onCheckedChange={setMfa} aria-label="Toggle MFA" />
+              <Switch checked={mfa} onCheckedChange={setMfa} aria-label={t("security.toggleMfa")} />
             </CardHeader>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Active sessions</CardTitle>
-              <CardDescription>Sign out other devices if you suspect anything.</CardDescription>
+              <CardTitle>{t("security.sessions")}</CardTitle>
+              <CardDescription>{t("security.sessionsDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="px-0 pb-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Device</TableHead>
-                    <TableHead>Last active</TableHead>
+                    <TableHead>{tCommon("device")}</TableHead>
+                    <TableHead>{tCommon("lastActive")}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -163,7 +166,7 @@ export default function SettingsPage() {
                           {s.agent}
                           {s.current && (
                             <Badge variant="success" className="text-[10px]">
-                              current
+                              {tCommon("current")}
                             </Badge>
                           )}
                         </div>
@@ -177,9 +180,9 @@ export default function SettingsPage() {
                           size="sm"
                           disabled={s.current}
                           className="text-destructive hover:text-destructive"
-                          onClick={() => toast.success("Session revoked")}
+                          onClick={() => toast.success(t("security.sessionRevoked"))}
                         >
-                          Revoke
+                          {tCommon("revoke")}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -194,27 +197,25 @@ export default function SettingsPage() {
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
-                <CardTitle>API keys</CardTitle>
-                <CardDescription>
-                  Use API keys for CI/CD integrations. Treat them like passwords.
-                </CardDescription>
+                <CardTitle>{t("keys.title")}</CardTitle>
+                <CardDescription>{t("keys.description")}</CardDescription>
               </div>
               <Button
                 size="sm"
                 variant="gradient"
-                onClick={() => toast.success("API key created. Copy it before closing.")}
+                onClick={() => toast.success(t("keys.keyCreated"))}
               >
-                <Plus /> New key
+                <Plus /> {t("keys.newKey")}
               </Button>
             </CardHeader>
             <CardContent className="px-0 pb-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Token</TableHead>
-                    <TableHead>Scopes</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>{tCommon("name")}</TableHead>
+                    <TableHead>{tCommon("token")}</TableHead>
+                    <TableHead>{tCommon("scopes")}</TableHead>
+                    <TableHead>{tCommon("created")}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -230,7 +231,7 @@ export default function SettingsPage() {
                       <TableCell>
                         <button
                           className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-card/40 px-2 py-1 font-mono text-xs hover:bg-secondary/40"
-                          onClick={() => toast.success("Key copied")}
+                          onClick={() => toast.success(t("keys.keyCopied"))}
                         >
                           <span>{k.preview}</span>
                           <Copy className="h-3 w-3 text-muted-foreground" />
@@ -264,22 +265,24 @@ export default function SettingsPage() {
         <TabsContent value="appearance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Theme</CardTitle>
-              <CardDescription>Dark is the default — light theme is also supported.</CardDescription>
+              <CardTitle>{t("appearance.title")}</CardTitle>
+              <CardDescription>{t("appearance.description")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid max-w-xl gap-3 sm:grid-cols-2">
                 <ThemeOption
-                  label="Dark"
+                  label={tTheme("dark")}
                   value="dark"
                   active={theme === "dark"}
                   onClick={() => setTheme("dark")}
+                  activeLabel={tCommon("active")}
                 />
                 <ThemeOption
-                  label="Light"
+                  label={tTheme("light")}
                   value="light"
                   active={theme === "light"}
                   onClick={() => setTheme("light")}
+                  activeLabel={tCommon("active")}
                 />
               </div>
             </CardContent>
@@ -296,11 +299,13 @@ function ThemeOption({
   value,
   active,
   onClick,
+  activeLabel,
 }: {
   label: string;
   value: string;
   active: boolean;
   onClick: () => void;
+  activeLabel: string;
 }) {
   return (
     <button
@@ -325,7 +330,7 @@ function ThemeOption({
       </div>
       <div className="flex items-center justify-between px-2 pb-1 pt-2 text-sm">
         {label}
-        {active && <Badge variant="success">active</Badge>}
+        {active && <Badge variant="success">{activeLabel}</Badge>}
       </div>
     </button>
   );

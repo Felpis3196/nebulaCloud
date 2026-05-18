@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { api, ApiError } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import type { Project } from "@/types/api";
+import { useTranslations } from "next-intl";
 
 const webhookURL = `${env.NEXT_PUBLIC_API_URL}/api/v1/webhooks/github`;
 
@@ -31,20 +32,31 @@ interface Props {
 }
 
 export function ConnectRepoDialog({ projectId, trigger }: Props) {
+  const t = useTranslations("projects.connectRepo");
+  const tCommon = useTranslations("common");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [repo, setRepo] = useState("");
   const [branch, setBranch] = useState("main");
+  const [installationId, setInstallationId] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!projectId) {
-      toast.error("Open this dialog from a project to save the repository URL.");
+      toast.error(t("needProject"));
       return;
     }
     setSubmitting(true);
     try {
+      const trimmedInst = installationId.trim();
+      if (trimmedInst !== "") {
+        const n = Number.parseInt(trimmedInst, 10);
+        if (!Number.isFinite(n) || n <= 0) {
+          toast.error(t("invalidInstallation"));
+          return;
+        }
+      }
       await api<Project>(`/api/v1/projects/${projectId}`, {
         method: "PATCH",
         body: {
@@ -52,12 +64,19 @@ export function ConnectRepoDialog({ projectId, trigger }: Props) {
           default_branch: branch.trim() || "main",
         },
       });
+      if (trimmedInst !== "") {
+        const n = Number.parseInt(trimmedInst, 10);
+        await api<Project>(`/api/v1/projects/${projectId}/github-installation`, {
+          method: "POST",
+          body: { installation_id: n },
+        });
+      }
       await qc.invalidateQueries({ queryKey: ["project", projectId] });
       await qc.invalidateQueries({ queryKey: ["projects"] });
       setOpen(false);
-      toast.success("Repository saved. Add the webhook URL in GitHub if you want automatic deploys.");
+      toast.success(trimmedInst ? t("savedWithInstall") : t("savedRepoOnly"));
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not save repository");
+      toast.error(err instanceof ApiError ? err.message : t("saveFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -71,57 +90,62 @@ export function ConnectRepoDialog({ projectId, trigger }: Props) {
         if (next) {
           setRepo("");
           setBranch("main");
+          setInstallationId("");
         }
       }}
     >
       <DialogTrigger asChild>
         {trigger ?? (
           <Button variant="outline" size="sm" type="button" disabled={!projectId}>
-            <Github className="h-4 w-4" /> Connect repository
+            <Github className="h-4 w-4" /> {t("connectButton")}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Connect a repository</DialogTitle>
-          <DialogDescription>
-            Saves the clone URL and default branch on this project. Configure a GitHub webhook
-            below to trigger deploys on push (Phase 3 will automate this).
-          </DialogDescription>
+          <DialogTitle>{t("dialogTitle")}</DialogTitle>
+          <DialogDescription>{t("dialogDescription")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="nebula-webhook-url">Webhook endpoint (GitHub → Nebula)</Label>
+            <Label htmlFor="nebula-webhook-url">{t("webhookEndpoint")}</Label>
             <Input id="nebula-webhook-url" readOnly className="font-mono text-xs" value={webhookURL} />
-            <p className="text-xs text-muted-foreground">
-              Use Content type <span className="font-mono">application/json</span>, secret from{" "}
-              <span className="font-mono">NEBULA_GITHUB_APP_WEBHOOK_SECRET</span>, events:{" "}
-              <span className="font-mono">push</span>.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("webhookHint")}</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="repo">Repository URL</Label>
+            <Label htmlFor="github-installation-id">{t("installationId")}</Label>
+            <Input
+              id="github-installation-id"
+              inputMode="numeric"
+              placeholder={t("installationPlaceholder")}
+              value={installationId}
+              onChange={(e) => setInstallationId(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">{t("installationHintLong")}</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="repo">{t("repoUrl")}</Label>
             <Input
               id="repo"
               required
-              placeholder="https://github.com/your-org/your-repo"
+              placeholder={t("repoPlaceholder")}
               value={repo}
               onChange={(e) => setRepo(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="branch">Default branch</Label>
+            <Label htmlFor="branch">{t("defaultBranch")}</Label>
             <Input id="branch" value={branch} onChange={(e) => setBranch(e.target.value)} />
           </div>
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {tCommon("cancel")}
               </Button>
             </DialogClose>
             <Button type="submit" variant="gradient" disabled={submitting || !projectId} className="inline-flex items-center gap-2">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Save
+              {submitting ? t("saving") : tCommon("save")}
             </Button>
           </DialogFooter>
         </form>

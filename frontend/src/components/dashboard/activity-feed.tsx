@@ -1,3 +1,5 @@
+"use client";
+
 import {
   AlertTriangle,
   GitMerge,
@@ -7,6 +9,8 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
+import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { relativeTime } from "@/lib/utils";
 
@@ -99,11 +103,19 @@ const ACTIVITIES: Activity[] = [
 ];
 
 export function ActivityFeed() {
+  const t = useTranslations("dashboard.activity");
+
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Activity</CardTitle>
-        <CardDescription>Audit trail across your workspace.</CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>
+          {t("description")}{" "}
+          <Link href="/deployments" className="underline underline-offset-2">
+            {t("deploymentsLink")}
+          </Link>
+          .
+        </CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-2">
         <ul className="space-y-0.5">

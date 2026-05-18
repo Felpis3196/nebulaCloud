@@ -11,18 +11,22 @@ import { StatusPill } from "@/components/dashboard/status-pill";
 import { DeploymentDetailDrawer } from "@/components/deployments/deployment-detail-drawer";
 import type { Deployment, DeploymentStatus } from "@/types/api";
 import { formatDuration, relativeTime, shortSha } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
-const STATUSES: { value: DeploymentStatus | "all"; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "running", label: "Running" },
-  { value: "building", label: "Building" },
-  { value: "deploying", label: "Deploying" },
-  { value: "queued", label: "Queued" },
-  { value: "failed", label: "Failed" },
-  { value: "rolled_back", label: "Rolled back" },
-];
+const STATUS_VALUES = [
+  "all",
+  "running",
+  "building",
+  "deploying",
+  "queued",
+  "failed",
+  "rolled_back",
+] as const;
 
 export function DeploymentsTable({ deployments }: { deployments: Deployment[] }) {
+  const t = useTranslations("deployments.table");
+  const tStatus = useTranslations("status");
+  const tCommon = useTranslations("common");
   const [status, setStatus] = useState<DeploymentStatus | "all">("all");
   const [project, setProject] = useState<string>("all");
   const [query, setQuery] = useState("");
@@ -48,10 +52,8 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
       <Card>
         <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <CardTitle>Deployments</CardTitle>
-            <CardDescription>
-              Every deploy across your workspace, newest first. Click a row to inspect its pipeline.
-            </CardDescription>
+            <CardTitle>{t("title")}</CardTitle>
+            <CardDescription>{t("description")}</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -59,28 +61,28 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search commit, service..."
+                placeholder={t("search")}
                 className="h-9 w-56 pl-8 text-sm"
               />
             </div>
             <Select value={status} onValueChange={(v) => setStatus(v as DeploymentStatus | "all")}>
               <SelectTrigger className="h-9 w-[170px] text-sm">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t("statusPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
+                {STATUS_VALUES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {value === "all" ? t("allStatuses") : tStatus(value)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={project} onValueChange={setProject}>
               <SelectTrigger className="h-9 w-[170px] text-sm">
-                <SelectValue placeholder="Project" />
+                <SelectValue placeholder={t("projectPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All projects</SelectItem>
+                <SelectItem value="all">{t("allProjects")}</SelectItem>
                 {projects.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
@@ -94,12 +96,12 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Service</TableHead>
-                <TableHead>Commit</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Trigger</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>When</TableHead>
+                <TableHead>{t("service")}</TableHead>
+                <TableHead>{t("commit")}</TableHead>
+                <TableHead>{tCommon("status")}</TableHead>
+                <TableHead>{t("trigger")}</TableHead>
+                <TableHead>{t("duration")}</TableHead>
+                <TableHead>{t("when")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,7 +143,7 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
               {rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
-                    No deployments match your filters.
+                    {t("noMatch")}
                   </TableCell>
                 </TableRow>
               )}

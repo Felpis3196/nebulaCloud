@@ -285,8 +285,18 @@ without changes to higher-level modules.
 | 2     | Projects, services, env vars           | core CRUD + dashboard           |
 | 3     | GitHub App + webhooks                  | repo connect, on-push trigger   |
 | 4     | Build pipeline (Buildpacks)            | first image built and pushed    |
-| 5     | Runtime agent + Traefik dynamic config | first running deployed app      |
+| 5     | Runtime agent + Traefik (Docker provider) | first running deployed app (MVP: label routers, one container per service) |
 | 6     | Realtime logs + metrics                | live tail in dashboard          |
 | 7     | Custom domains + ACME                  | bring-your-own-domain           |
 | 8     | Web terminal                           | shell into running container    |
 | 9     | Hardening, tests, polish, docs         | production-ready                |
+
+### Runtime agent — local MVP behaviour
+
+The [`runtime-agent`](../backend/cmd/runtime-agent) consumes `deploy.run` jobs and:
+
+- Attaches workloads to **`nebula_platform`** so Traefik (with the mounted Docker socket) discovers containers on the same bridge network as the ingress.
+- Enforces **one active container per service**: it removes any existing containers labeled `nebula_service=<service_uuid>`, then starts a container with a **stable name** `nebula-svc-<12-char-hex>` so redeploys replace the previous instance instead of accumulating orphan containers.
+- Registers HTTP routers via **Traefik Docker labels** (no file-based `dynamic.yml` writes in this MVP).
+
+The compose file also defines **`nebula_apps`** for a future split where only user workloads attach there while the control plane stays separate. Later work: health-checked cutover, graceful drain, and rollback swap semantics as described in `DEPLOY-FLOW.md`.

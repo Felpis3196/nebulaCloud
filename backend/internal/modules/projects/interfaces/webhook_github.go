@@ -82,7 +82,15 @@ func (h *Handler) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		rawURL = strings.TrimSpace(envelope.Repo.GitURL)
 	}
 	norm := projectsinfra.NormalizeRepoURL(rawURL)
-	msg := envelope.HeadCommit.Message
+	sha := strings.TrimSpace(envelope.After)
+	if noopPushSHA(sha) {
+		sha = strings.TrimSpace(envelope.HeadCommit.ID)
+	}
+	if noopPushSHA(sha) {
+		httpx.OK(w, map[string]any{"status": "ignored", "reason": "noop_commit"})
+		return
+	}
+	msg := strings.TrimSpace(envelope.HeadCommit.Message)
 	ref := envelope.Ref
 
 	var instPtr *int64
@@ -91,8 +99,22 @@ func (h *Handler) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		instPtr = &id
 	}
 
-	n := h.svc.DispatchGitPush(r.Context(), norm, envelope.After, msg, ref, instPtr)
+	n := h.svc.DispatchGitPush(r.Context(), norm, sha, msg, ref, instPtr)
 	httpx.OK(w, map[string]any{"status": "ok", "enqueued_services": n})
+}
+
+// noopPushSHA is true for missing commits (branch delete) or GitHub's all-zero placeholder.
+func noopPushSHA(s string) bool {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return true
+	}
+	for _, c := range s {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
 }
 
 func verifyGithubHMAC(payload []byte, hexHeader string, secret string) bool {

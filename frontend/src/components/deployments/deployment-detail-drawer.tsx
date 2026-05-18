@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import type { Deployment } from "@/types/api";
 import { formatDuration, relativeTime, shortSha } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface Props {
   deployment: Deployment | null;
@@ -21,17 +22,18 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-const PIPELINE = [
-  { label: "Webhook received", duration: "120ms" },
-  { label: "Source cloned", duration: "1.4s" },
-  { label: "Stack detected", duration: "80ms" },
-  { label: "Image built", duration: "32s" },
-  { label: "Image pushed", duration: "4.1s" },
-  { label: "Replicas rolled", duration: "9.6s" },
-  { label: "Healthchecks", duration: "3.2s" },
-];
+const PIPELINE_STEPS = [
+  { key: "webhookReceived", duration: "120ms" },
+  { key: "sourceCloned", duration: "1.4s" },
+  { key: "stackDetected", duration: "80ms" },
+  { key: "imageBuilt", duration: "32s" },
+  { key: "imagePushed", duration: "4.1s" },
+  { key: "replicasRolled", duration: "9.6s" },
+  { key: "healthchecks", duration: "3.2s" },
+] as const;
 
 export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props) {
+  const t = useTranslations("deployments.drawer");
   if (!deployment) return null;
 
   return (
@@ -58,7 +60,7 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto pr-1">
           <section className="space-y-2">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <GitCommit className="h-3 w-3" /> Commit
+              <GitCommit className="h-3 w-3" /> {t("commitSection")}
             </div>
             <p className="text-sm">{deployment.commit_message}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -72,19 +74,19 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
 
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Pipeline
+              {t("pipeline")}
             </h3>
             <ol className="space-y-2">
-              {PIPELINE.map((step, i) => (
+              {PIPELINE_STEPS.map((step, i) => (
                 <li
-                  key={step.label}
+                  key={step.key}
                   className="flex items-center gap-3 rounded-md border border-border/60 bg-card/40 px-3 py-2 text-sm"
                 >
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
                   <span className="font-mono text-xs text-muted-foreground">
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span className="flex-1">{step.label}</span>
+                  <span className="flex-1">{t(step.key)}</span>
                   <span className="font-mono text-xs text-muted-foreground">{step.duration}</span>
                 </li>
               ))}
@@ -93,7 +95,7 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
 
           <section className="space-y-3">
             <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Terminal className="h-3 w-3" /> Build log preview
+              <Terminal className="h-3 w-3" /> {t("buildLogPreview")}
             </h3>
             <div className="overflow-hidden rounded-md border border-border/60 bg-card/40 font-mono text-[12px]">
               {[
@@ -118,7 +120,7 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
 
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Image
+              {t("image")}
             </h3>
             <code className="block break-all rounded-md border border-border/60 bg-card/40 px-3 py-2 font-mono text-xs">
               {deployment.image_ref}
@@ -128,11 +130,11 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
 
         <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
           <Button variant="outline" size="sm">
-            View logs
+            {t("viewLogs")}
           </Button>
           <Button variant="gradient" size="sm">
             <RotateCcw />
-            Rollback
+            {t("rollback")}
           </Button>
         </div>
       </SheetContent>

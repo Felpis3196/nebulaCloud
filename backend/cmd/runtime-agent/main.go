@@ -97,10 +97,9 @@ func deployHandler(pool *pgxpool.Pool, cfg config.Config) platformqueue.HandlerF
 		log := slog.Default().With("deployment_id", p.DeploymentID, "service_id", p.ServiceID)
 		log.Info("deploy.start", "image", p.ImageRef)
 
-		cname := containerName(svcID, depID)
-		rm := exec.CommandContext(ctx, "docker", "rm", "-f", cname)
-		_, _ = rm.CombinedOutput()
+		pruneLabeledServiceContainers(ctx, svcID)
 
+		cname := stableContainerName(svcID)
 		img := strings.TrimSpace(p.ImageRef)
 		pull := exec.CommandContext(ctx, "docker", "pull", img)
 		o, err := pull.CombinedOutput()
@@ -149,24 +148,35 @@ func deployHandler(pool *pgxpool.Pool, cfg config.Config) platformqueue.HandlerF
 	}
 }
 
+func pruneLabeledServiceContainers(ctx context.Context, serviceID uuid.UUID) {
+	filter := "label=nebula_service=" + serviceID.String()
+	cmd := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", filter)
+	out, err := cmd.Output()
+	if err != nil {
+		return
+	}
+	for _, id := range strings.Fields(strings.TrimSpace(string(out))) {
+		if id == "" {
+			continue
+		}
+		_ = exec.CommandContext(ctx, "docker", "rm", "-f", id).Run()
+	}
+}
+
+func stableContainerName(svcID uuid.UUID) string {
+	s := strings.ReplaceAll(strings.ToLower(svcID.String()), "-", "")
+	if len(s) > 12 {
+		s = s[:12]
+	}
+	return "nebula-svc-" + s
+}
+
 func shortID(id uuid.UUID) string {
 	s := strings.ReplaceAll(strings.ToLower(id.String()), "-", "")
 	if len(s) < 8 {
 		return s + "00000000"
 	}
 	return s[:8]
-}
-
-func containerName(serviceID, depID uuid.UUID) string {
-	s := strings.ReplaceAll(strings.ToLower(serviceID.String()), "-", "")
-	if len(s) > 12 {
-		s = s[:12]
-	}
-	d := strings.ReplaceAll(strings.ToLower(depID.String()), "-", "")
-	if len(d) > 12 {
-		d = d[:12]
-	}
-	return "nebula-svc-" + s + "-" + d
 }
 
 func sanitize(s string) string {

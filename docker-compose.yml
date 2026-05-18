@@ -43,6 +43,8 @@ services:
     image: traefik:v3.1
     <<: *default-restart
     logging: *default-logging
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
     command:
       - --configFile=/etc/traefik/traefik.yml
     ports:
@@ -239,7 +241,11 @@ services:
       target: api
     <<: *default-restart
     logging: *default-logging
-    env_file: .env
+    # Defaults from repo; optional `.env` overrides (copy from .env.example if you want a local file).
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
     environment:
       NEBULA_SERVICE_NAME: nebula-api
       POSTGRES_HOST: postgres
@@ -274,7 +280,10 @@ services:
       target: build-worker
     <<: *default-restart
     logging: *default-logging
-    env_file: .env
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
     environment:
       NEBULA_SERVICE_NAME: nebula-build-worker
       POSTGRES_HOST: postgres
@@ -300,7 +309,10 @@ services:
       target: runtime-agent
     <<: *default-restart
     logging: *default-logging
-    env_file: .env
+    env_file:
+      - .env.example
+      - path: .env
+        required: false
     environment:
       NEBULA_SERVICE_NAME: nebula-runtime-agent
       POSTGRES_HOST: postgres

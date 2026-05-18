@@ -57,14 +57,19 @@ sequenceDiagram
 
     RA->>Q: pull deploy.run
     RA->>RA: docker pull image_ref
-    RA->>RA: docker create + start (with labels)
-    RA->>RA: wait for healthcheck (configurable)
-    RA->>TR: write dynamic.yml entry
+    RA->>RA: remove containers labeled nebula_service
+    RA->>RA: docker run stable name + Traefik labels on nebula_platform
+    RA->>TR: Docker provider reads labels (no dynamic.yml in MVP)
     RA->>DB: deployment(running), service.current_image=image_ref
-    RA->>RA: drain previous container (graceful), then remove
 
     Note over RA,TR: Failure path<br/>RA marks deployment(failed)<br/>previous container kept alive
 ```
+
+### MVP runtime (local compose)
+
+- Workloads join **`nebula_platform`** so Traefik’s Docker provider (same socket + network) can attach routers from container labels.
+- **One container per service**: the agent deletes any container with `label=nebula_service=<uuid>` before starting the new revision under a **stable** container name (`nebula-svc-<prefix>`), avoiding orphaned containers from earlier deploys.
+- **Not yet implemented** vs this document’s ideal path: file-based `dynamic.yml`, health-gated traffic switch, and automated rollback container swap (see Failure handling above for the target behaviour).
 
 ## Rollback
 

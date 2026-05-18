@@ -13,6 +13,7 @@ import {
 import { TimerangePicker, type TimerangeId } from "@/components/metrics/timerange-picker";
 import { useServices } from "@/hooks/use-services";
 import { useMetrics } from "@/hooks/use-metrics";
+import { useTranslations } from "next-intl";
 
 const duration: Record<TimerangeId, string> = {
   "15m": "15m",
@@ -23,6 +24,8 @@ const duration: Record<TimerangeId, string> = {
 };
 
 export default function ProjectMetricsPage() {
+  const t = useTranslations("dashboard.metrics");
+  const tCommon = useTranslations("common");
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
   const { data: services = [], isPending: servicesLoading } = useServices(id);
@@ -40,11 +43,11 @@ export default function ProjectMetricsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {servicesLoading ? (
-          <p className="text-sm text-muted-foreground">Loading services…</p>
+          <p className="text-sm text-muted-foreground">{t("loadingServices")}</p>
         ) : services.length > 0 ? (
           <Select value={resolved} onValueChange={setServiceId}>
             <SelectTrigger className="h-9 w-[220px]">
-              <SelectValue placeholder="Service" />
+              <SelectValue placeholder={tCommon("service")} />
             </SelectTrigger>
             <SelectContent>
               {services.map((s) => (
@@ -55,18 +58,16 @@ export default function ProjectMetricsPage() {
             </SelectContent>
           </Select>
         ) : (
-          <p className="text-sm text-muted-foreground">No services in this project.</p>
+          <p className="text-sm text-muted-foreground">{t("noService")}</p>
         )}
         <TimerangePicker value={range} onChange={setRange} />
       </div>
 
       {metricsLoading && resolved ? (
-        <p className="text-sm text-muted-foreground">Loading metrics…</p>
+        <p className="text-sm text-muted-foreground">{t("loadingMetrics")}</p>
       ) : metrics.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {resolved
-            ? "No datapoints yet — once Prometheus scrape labels match this service id, graphs appear here."
-            : "Create a service in this project to view scaffolded charts."}
+          {resolved ? t("noData") : t("noService")}
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">

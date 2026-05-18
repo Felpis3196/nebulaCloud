@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ArrowRight, GitCommit } from "lucide-react";
 import type { Deployment } from "@/types/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,20 +12,25 @@ import { cn, formatDuration, relativeTime, shortSha } from "@/lib/utils";
 interface Props {
   deployments: Deployment[];
   limit?: number;
+  /** Overrides default card description (e.g. when data is not org-wide). */
+  timelineDescription?: string;
 }
 
-export function DeployTimeline({ deployments, limit = 8 }: Props) {
+export function DeployTimeline({ deployments, limit = 8, timelineDescription }: Props) {
+  const t = useTranslations("dashboard.deployTimeline");
   const list = deployments.slice(0, limit);
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <CardTitle>Recent deployments</CardTitle>
-          <CardDescription>Latest activity across every service.</CardDescription>
+          <CardTitle>{t("title")}</CardTitle>
+          <CardDescription>
+            {timelineDescription ?? t("defaultDesc")}
+          </CardDescription>
         </div>
         <Button asChild variant="ghost" size="sm">
           <Link href="/deployments">
-            All
+            {t("all")}
             <ArrowRight />
           </Link>
         </Button>

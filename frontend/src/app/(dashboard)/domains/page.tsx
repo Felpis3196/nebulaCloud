@@ -1,18 +1,24 @@
-import { DomainsTable } from "@/components/domains/domains-table";
-import { MOCK_DOMAINS } from "@/lib/mock-data";
+"use client";
 
-export const metadata = { title: "Domains" };
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslations } from "next-intl";
 
 export default function DomainsPage() {
+  const t = useTranslations("dashboard.domains");
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Domains</h1>
-        <p className="text-sm text-muted-foreground">
-          Bring your own hostname. NebulaCloud handles TLS via Let's Encrypt.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </header>
-      <DomainsTable domains={MOCK_DOMAINS} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("cardTitle")}</CardTitle>
+          <CardDescription>{t("cardDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">{t("cardBody")}</CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { Cloud, Github } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { env } from "@/lib/env";
 
 export function LandingFooter() {
+  const t = useTranslations("landing");
+
   return (
     <footer className="border-t border-border/40">
       <div className="container py-12">
@@ -14,37 +19,32 @@ export function LandingFooter() {
               </div>
               <span className="text-sm font-semibold tracking-tight">NebulaCloud</span>
             </Link>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Self-hosted PaaS for shipping containerised applications straight from Git.
-              Built as a portfolio-grade reference architecture.
-            </p>
+            <p className="max-w-sm text-sm text-muted-foreground">{t("footerTagline")}</p>
           </div>
-          <FooterColumn title="Product">
-            <FooterLink href="#features">Features</FooterLink>
-            <FooterLink href="#how">How it works</FooterLink>
-            <FooterLink href="/login">Sign in</FooterLink>
+          <FooterColumn title={t("product")}>
+            <FooterLink href="#features">{t("features")}</FooterLink>
+            <FooterLink href="#how">{t("howItWorks")}</FooterLink>
+            <FooterLink href="/login">{t("signIn")}</FooterLink>
           </FooterColumn>
-          <FooterColumn title="Resources">
+          <FooterColumn title={t("resources")}>
             <FooterLink href={env.NEXT_PUBLIC_GITHUB_URL} external>
               <Github className="h-3 w-3" />
-              GitHub
+              {t("github")}
             </FooterLink>
             <FooterLink href={`${env.NEXT_PUBLIC_GITHUB_URL}/blob/main/docs/ARCHITECTURE.md`} external>
-              Architecture
+              {t("architecture")}
             </FooterLink>
             <FooterLink href={`${env.NEXT_PUBLIC_GITHUB_URL}/blob/main/docs/SECURITY.md`} external>
-              Security
+              {t("security")}
             </FooterLink>
           </FooterColumn>
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} NebulaCloud — MIT licensed.
+            {t("copyright", { year: new Date().getFullYear() })}
           </p>
-          <p className="font-mono text-xs text-muted-foreground">
-            v0.1.0 · Phase 1 (identity)
-          </p>
+          <p className="font-mono text-xs text-muted-foreground">{t("version")}</p>
         </div>
       </div>
     </footer>

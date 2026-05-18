@@ -10,9 +10,13 @@ import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/utils";
 import { useProject } from "@/hooks/use-project";
 import { useServices } from "@/hooks/use-services";
-import { api } from "@/lib/api-client";
+import { api, ApiError } from "@/lib/api-client";
+import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 export default function ProjectOverviewPage() {
+  const t = useTranslations("projects.detail");
+  const tCommon = useTranslations("common");
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
@@ -22,29 +26,39 @@ export default function ProjectOverviewPage() {
   const { data: services = [] } = useServices(id);
 
   if (isLoading || !project) {
-    return <div className="text-sm text-muted-foreground">Loading…</div>;
+    return <div className="text-sm text-muted-foreground">{tCommon("loading")}</div>;
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Services</CardTitle>
+          <CardTitle>{t("services")}</CardTitle>
           <Button
             size="sm"
             variant="secondary"
             onClick={async () => {
               if (!id) return;
-              await api(`/api/v1/projects/${id}/services`, {
-                method: "POST",
-                body: { slug: "web", name: "Web", type: "web" },
-              });
-              await qc.invalidateQueries({ queryKey: ["services", id] });
-              await qc.invalidateQueries({ queryKey: ["project", id] });
-              await qc.invalidateQueries({ queryKey: ["projects"] });
+              const suffix =
+                typeof crypto !== "undefined" && "randomUUID" in crypto
+                  ? crypto.randomUUID().replace(/-/g, "").slice(0, 8)
+                  : String(Date.now());
+              const slug = `web-${suffix}`;
+              try {
+                await api(`/api/v1/projects/${id}/services`, {
+                  method: "POST",
+                  body: { slug, name: "Web", type: "web" },
+                });
+                await qc.invalidateQueries({ queryKey: ["services", id] });
+                await qc.invalidateQueries({ queryKey: ["project", id] });
+                await qc.invalidateQueries({ queryKey: ["projects"] });
+                toast.success(t("serviceCreated", { slug }));
+              } catch (e) {
+                toast.error(e instanceof ApiError ? e.message : t("createServiceFailed"));
+              }
             }}
           >
-            Add web service
+            {t("addWebService")}
           </Button>
         </CardHeader>
         <CardContent className="px-0 pb-0">
@@ -64,8 +78,8 @@ export default function ProjectOverviewPage() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="font-mono">{s.current_image ?? "—"}</span>
-                    <span>{s.replicas} replicas</span>
-                    <span>updated {relativeTime(s.updated_at)}</span>
+                    <span>{t("replicas", { count: s.replicas })}</span>
+                    <span>{t("updatedAgo", { time: relativeTime(s.updated_at) })}</span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -76,11 +90,11 @@ export default function ProjectOverviewPage() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                     >
-                      Open <ExternalLink className="h-3 w-3" />
+                      {t("open")} <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
                   <Button size="sm" variant="outline" asChild className="h-7 px-2 text-[11px]">
-                    <Link href={`/deployments?s=${encodeURIComponent(s.id)}`}>Deploy log</Link>
+                    <Link href={`/deployments?s=${encodeURIComponent(s.id)}`}>{t("deployLog")}</Link>
                   </Button>
                   <Button
                     size="sm"
@@ -95,7 +109,7 @@ export default function ProjectOverviewPage() {
                       router.push(`/projects/${id}/deployments`);
                     }}
                   >
-                    Deploy
+                    {t("deploy")}
                   </Button>
                   <StatusPill status={s.status} />
                 </div>
@@ -103,20 +117,20 @@ export default function ProjectOverviewPage() {
             ))}
           </ul>
           {services.length === 0 && (
-            <p className="px-5 pb-5 text-sm text-muted-foreground">No services yet — add one above.</p>
+            <p className="px-5 pb-5 text-sm text-muted-foreground">{t("noServices")}</p>
           )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Quick stats</CardTitle>
+          <CardTitle>{t("quickStats")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <Row label="Created" value={relativeTime(project.created_at)} />
-          <Row label="Last updated" value={relativeTime(project.updated_at)} />
-          <Row label="Default branch" value={project.default_branch} mono />
-          <Row label="Services" value={String(project.services_count)} />
+          <Row label={t("created")} value={relativeTime(project.created_at)} />
+          <Row label={t("lastUpdated")} value={relativeTime(project.updated_at)} />
+          <Row label={t("defaultBranch")} value={project.default_branch} mono />
+          <Row label={t("services")} value={String(project.services_count)} />
         </CardContent>
       </Card>
     </div>

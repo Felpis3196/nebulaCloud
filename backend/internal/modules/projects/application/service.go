@@ -136,6 +136,19 @@ func replicasFromRuntime(raw json.RawMessage) int {
 	return 1
 }
 
+func noopGitSHA(sha string) bool {
+	s := strings.TrimSpace(strings.ToLower(sha))
+	if s == "" {
+		return true
+	}
+	for _, c := range s {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
+}
+
 func composeImageRef(reg string, orgSlug, projSlug, svcSlug string, deploymentID uuid.UUID) string {
 	reg = strings.TrimSuffix(strings.TrimSpace(reg), "/")
 	tag := strings.ToLower(deploymentID.String()[:12])
@@ -428,6 +441,17 @@ func (s *Service) StartDeployment(ctx context.Context, actor auth.Principal, ser
 
 // StartDeploymentWebhook is invoked after GitHub webhook verification.
 func (s *Service) StartDeploymentWebhook(ctx context.Context, serviceID uuid.UUID, sha, msg, ref *string) (uuid.UUID, error) {
+	if sha == nil || noopGitSHA(*sha) {
+		return uuid.Nil, nil
+	}
+	sTrim := strings.TrimSpace(*sha)
+	dup, err := s.repo.HasRecentWebhookDeployment(ctx, serviceID, sTrim, time.Now().UTC().Add(-60*time.Second))
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if dup {
+		return uuid.Nil, nil
+	}
 	svc, err := s.repo.GetService(ctx, serviceID)
 	if err != nil {
 		return uuid.Nil, err
@@ -440,7 +464,8 @@ func (s *Service) StartDeploymentWebhook(ctx context.Context, serviceID uuid.UUI
 	if err != nil {
 		return uuid.Nil, err
 	}
-	depID, _, err := s.enqueueBuild(ctx, svc, project, org, "webhook", nil, sha, msg, ref)
+	shaNorm := sTrim
+	depID, _, err := s.enqueueBuild(ctx, svc, project, org, "webhook", nil, &shaNorm, msg, ref)
 	return depID, err
 }
 
@@ -463,11 +488,14 @@ func (s *Service) DispatchGitPush(ctx context.Context, normalizedRepo, sha, msg,
 		shaCopy := sha
 		msgCopy := msg
 		for _, svc := range srvs {
-			if _, err := s.StartDeploymentWebhook(ctx, svc.ID, &shaCopy, &msgCopy, &refCopy); err != nil {
+			depID, err := s.StartDeploymentWebhook(ctx, svc.ID, &shaCopy, &msgCopy, &refCopy)
+			if err != nil {
 				logger.FromContext(ctx).Warn("dispatch.push.enqueue_failed", "service_id", svc.ID.String(), "error", err)
 				continue
 			}
-			n++
+			if depID != uuid.Nil {
+				n++
+			}
 		}
 	}
 	return n
@@ -475,6 +503,9 @@ func (s *Service) DispatchGitPush(ctx context.Context, normalizedRepo, sha, msg,
 
 // SetProjectGitHubInstallation persists the GitHub App installation id (used after verified OAuth / App flow).
 func (s *Service) SetProjectGitHubInstallation(ctx context.Context, actor auth.Principal, projectID uuid.UUID, installationID int64) (projectsinfra.ProjectRow, error) {
+	if installationID <= 0 {
+		return projectsinfra.ProjectRow{}, platformerrors.Validation("installation_id must be positive")
+	}
 	p, err := s.repo.GetProject(ctx, projectID)
 	if err != nil {
 		return projectsinfra.ProjectRow{}, err

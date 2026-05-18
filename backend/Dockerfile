@@ -11,6 +11,8 @@
 # ============================================================================
 
 ARG GO_VERSION=1.23
+# Official Docker CLI image (Alpine). Tags like docker:24-cli-alpine do not exist on Hub.
+ARG DOCKER_CLI_IMAGE=docker:27-cli
 
 # ---------------------------------------------------------------------------
 # Builder
@@ -47,10 +49,19 @@ EXPOSE 8080 9100
 ENTRYPOINT ["/app/api"]
 
 # ---------------------------------------------------------------------------
-# Build worker runtime (needs Docker CLI + git)
+# Build worker runtime (Docker CLI + git + pack for Cloud Native Buildpacks)
 # ---------------------------------------------------------------------------
-FROM docker:24-cli-alpine AS build-worker
-RUN apk add --no-cache git ca-certificates libc6-compat
+FROM ${DOCKER_CLI_IMAGE} AS build-worker
+RUN apk add --no-cache git ca-certificates libc6-compat curl tar \
+ && PACK_VERSION=0.35.1 \
+ && ARCH="$(uname -m)" \
+ && case "$ARCH" in \
+      x86_64)  PACK_URL="https://github.com/buildpacks/pack/releases/download/v${PACK_VERSION}/pack-v${PACK_VERSION}-linux.tgz" ;; \
+      aarch64) PACK_URL="https://github.com/buildpacks/pack/releases/download/v${PACK_VERSION}/pack-v${PACK_VERSION}-linux-arm64.tgz" ;; \
+      *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac \
+ && curl -fsSL "$PACK_URL" | tar -xz -C /usr/local/bin pack \
+ && chmod +x /usr/local/bin/pack
 WORKDIR /app
 COPY --from=builder /out/build-worker /app/build-worker
 ENTRYPOINT ["/app/build-worker"]
@@ -58,7 +69,7 @@ ENTRYPOINT ["/app/build-worker"]
 # ---------------------------------------------------------------------------
 # Runtime agent (Docker CLI against mounted socket)
 # ---------------------------------------------------------------------------
-FROM docker:24-cli-alpine AS runtime-agent
+FROM ${DOCKER_CLI_IMAGE} AS runtime-agent
 RUN apk add --no-cache ca-certificates libc6-compat
 WORKDIR /app
 COPY --from=builder /out/runtime-agent /app/runtime-agent

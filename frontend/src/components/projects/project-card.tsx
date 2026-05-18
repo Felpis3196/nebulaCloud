@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ArrowRight, GitBranch, Github } from "lucide-react";
 import type { Project } from "@/types/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -6,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { relativeTime } from "@/lib/utils";
 
 export function ProjectCard({ project }: { project: Project }) {
+  const t = useTranslations("dashboard.projects");
+  const tCommon = useTranslations("common");
+
   return (
     <Link href={`/projects/${project.id}`} className="group block">
       <Card className="h-full transition-all hover:-translate-y-px hover:border-primary/40">
@@ -15,11 +21,11 @@ export function ProjectCard({ project }: { project: Project }) {
               {project.name}
             </h3>
             <p className="line-clamp-2 text-sm text-muted-foreground">
-              {project.description ?? "No description"}
+              {project.description ?? tCommon("noDescription")}
             </p>
           </div>
           <Badge variant="muted" className="shrink-0">
-            {project.services_count} svc
+            {t("svcCount", { count: project.services_count })}
           </Badge>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -36,10 +42,10 @@ export function ProjectCard({ project }: { project: Project }) {
               <GitBranch className="h-3 w-3" />
               <span className="font-mono">{project.default_branch}</span>
             </span>
-            <span>updated {relativeTime(project.updated_at)}</span>
+            <span>{t("updatedAgo", { time: relativeTime(project.updated_at) })}</span>
           </div>
           <div className="flex items-center text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-            View project <ArrowRight className="ml-1 h-3 w-3" />
+            {t("viewProject")} <ArrowRight className="ml-1 h-3 w-3" />
           </div>
         </CardContent>
       </Card>

@@ -64,7 +64,7 @@ func (h *Handler) Mount(r chi.Router) {
 
 	r.Get("/deployments/{deploymentID}", h.getDeployment)
 
-	r.Post("/integrations/github/installation", h.StubGithubInstallationLink)
+	r.Post("/projects/{projectID}/github-installation", h.linkGithubInstallation)
 }
 
 func principal(r *http.Request) (auth.Principal, bool) {
@@ -171,30 +171,32 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 // --- Projects ---
 
 type projectDTO struct {
-	ID               string  `json:"id"`
-	OrganizationID   string  `json:"organization_id"`
-	Slug             string  `json:"slug"`
-	Name             string  `json:"name"`
-	Description      *string `json:"description,omitempty"`
-	RepoURL          *string `json:"repo_url,omitempty"`
-	DefaultBranch    string  `json:"default_branch"`
-	ServicesCount    int     `json:"services_count"`
-	CreatedAt        string  `json:"created_at"`
-	UpdatedAt        string  `json:"updated_at"`
+	ID                     string  `json:"id"`
+	OrganizationID         string  `json:"organization_id"`
+	Slug                   string  `json:"slug"`
+	Name                   string  `json:"name"`
+	Description            *string `json:"description,omitempty"`
+	RepoURL                *string `json:"repo_url,omitempty"`
+	DefaultBranch          string  `json:"default_branch"`
+	GitHubInstallationID   *int64  `json:"github_installation_id,omitempty"`
+	ServicesCount          int     `json:"services_count"`
+	CreatedAt              string  `json:"created_at"`
+	UpdatedAt              string  `json:"updated_at"`
 }
 
 func toProjectDTO(p projectsinfra.ProjectRow, svcCount int) projectDTO {
 	return projectDTO{
-		ID:             p.ID.String(),
-		OrganizationID: p.OrganizationID.String(),
-		Slug:           p.Slug,
-		Name:           p.Name,
-		Description:    p.Description,
-		RepoURL:        p.RepoURL,
-		DefaultBranch:  p.DefaultBranch,
-		ServicesCount:    svcCount,
-		CreatedAt:      p.CreatedAt.UTC().Format(time.RFC3339Nano),
-		UpdatedAt:      p.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		ID:                   p.ID.String(),
+		OrganizationID:       p.OrganizationID.String(),
+		Slug:                 p.Slug,
+		Name:                 p.Name,
+		Description:          p.Description,
+		RepoURL:              p.RepoURL,
+		DefaultBranch:        p.DefaultBranch,
+		GitHubInstallationID: p.GitHubInstallID,
+		ServicesCount:        svcCount,
+		CreatedAt:            p.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:            p.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
 
@@ -773,3 +775,38 @@ func (h *Handler) serviceMetrics(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, series)
 }
 
+type linkGithubInstallationBody struct {
+	InstallationID int64 `json:"installation_id"`
+}
+
+func (h *Handler) linkGithubInstallation(w http.ResponseWriter, r *http.Request) {
+	pr, ok := principal(r)
+	if !ok {
+		httpx.Error(w, platformerrors.Unauthorized("not authenticated"))
+		return
+	}
+	pid, ok2 := parseUUID(chi.URLParam(r, "projectID"), w)
+	if !ok2 {
+		return
+	}
+	var body linkGithubInstallationBody
+	if err := httpx.DecodeJSON(r, &body); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	if body.InstallationID <= 0 {
+		httpx.Error(w, platformerrors.Validation("installation_id must be positive"))
+		return
+	}
+	row, err := h.svc.SetProjectGitHubInstallation(r.Context(), pr, pid, body.InstallationID)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	cnt, err := h.svc.CountServices(r.Context(), pr, pid)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.OK(w, toProjectDTO(row, cnt))
+}

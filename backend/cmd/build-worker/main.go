@@ -1,4 +1,5 @@
-// Command build-worker drains asynq build jobs (git clone → docker build → push → enqueue deploy.run).
+// Command build-worker drains asynq build jobs (git clone → stack detect →
+// docker build or pack build → push → enqueue deploy.run).
 package main
 
 import (
@@ -10,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nebulacloud/nebula/internal/buildworker"
 	"github.com/nebulacloud/nebula/internal/jobs"
 	projectsinfra "github.com/nebulacloud/nebula/internal/modules/projects/infrastructure"
 	"github.com/nebulacloud/nebula/internal/platform/config"
@@ -105,42 +106,45 @@ func buildHandler(pool *pgxpool.Pool, cfg config.Config, prod platformqueue.Prod
 			return err
 		}
 
-		_ = repo.UpdateBuildFields(ctx, buildID, host, "cloning", ptr("docker"), nil, nil)
+		dfRel := strings.TrimSpace(p.DockerfilePath)
+
+		_ = repo.UpdateBuildFields(ctx, buildID, host, "cloning", nil, nil, nil)
 		workDir, err := os.MkdirTemp("", "nebula-build-*")
 		if err != nil {
 			return fail(repo, ctx, host, depID, buildID, fmt.Errorf("tmpdir: %w", err))
 		}
 		defer func() { _ = os.RemoveAll(workDir) }()
 
-		branch := strings.TrimSpace(bc.Ref)
-		if branch == "" {
-			branch = "main"
-		}
-		g := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", branch, strings.TrimSpace(bc.RepoURL), ".")
-		g.Dir = workDir
-		out, err := g.CombinedOutput()
-		if err != nil {
-			log.Error("git.clone", "err", err, "out", string(out))
-			return fail(repo, ctx, host, depID, buildID, fmt.Errorf("git clone: %w — %s", err, shorten(string(out))))
+		if err := buildworker.CloneSource(ctx, workDir, strings.TrimSpace(bc.RepoURL), bc.Ref, bc.CommitSHA); err != nil {
+			log.Error("git.checkout", "err", err)
+			return fail(repo, ctx, host, depID, buildID, err)
 		}
 
-		_ = repo.UpdateBuildFields(ctx, buildID, host, "building", ptr("docker"), nil, nil)
+		_ = repo.UpdateBuildFields(ctx, buildID, host, "detecting", nil, nil, nil)
+		mode, detected, err := buildworker.DetectStack(workDir, dfRel)
+		if err != nil {
+			return fail(repo, ctx, host, depID, buildID, err)
+		}
+
 		img := strings.TrimSpace(p.ImageRef)
-		dfile := filepath.Join(workDir, dockerfile(bc.BuildConfig))
-		if _, err := os.Stat(dfile); err != nil {
-			return fail(repo, ctx, host, depID, buildID, fmt.Errorf("%s not found", filepath.Base(dfile)))
+
+		_ = repo.UpdateBuildFields(ctx, buildID, host, "building", &detected, nil, nil)
+		switch mode {
+		case buildworker.ModeDockerfile:
+			if err := buildworker.RunDockerBuild(ctx, workDir, img, dfRel); err != nil {
+				log.Error("docker.build", "err", err)
+				return fail(repo, ctx, host, depID, buildID, err)
+			}
+		case buildworker.ModeBuildpack:
+			if err := buildworker.RunPackBuild(ctx, workDir, img, cfg.Build.BuilderImage); err != nil {
+				log.Error("pack.build", "err", err)
+				return fail(repo, ctx, host, depID, buildID, err)
+			}
+		default:
+			return fail(repo, ctx, host, depID, buildID, fmt.Errorf("unknown build mode"))
 		}
 
-		build := exec.CommandContext(ctx, "docker", "build", "-t", img, "-f", filepath.Base(dfile), ".")
-		build.Dir = workDir
-		build.Env = append(os.Environ(), "DOCKER_BUILDKIT=1")
-		o2, err := build.CombinedOutput()
-		if err != nil {
-			log.Error("docker.build", "err", err, "out", string(o2))
-			return fail(repo, ctx, host, depID, buildID, fmt.Errorf("docker build: %w — %s", err, shorten(string(o2))))
-		}
-
-		_ = repo.UpdateBuildFields(ctx, buildID, host, "pushing", ptr("docker"), nil, nil)
+		_ = repo.UpdateBuildFields(ctx, buildID, host, "pushing", &detected, nil, nil)
 
 		psh := exec.CommandContext(ctx, "docker", "push", img)
 		o3, err := psh.CombinedOutput()
@@ -150,7 +154,7 @@ func buildHandler(pool *pgxpool.Pool, cfg config.Config, prod platformqueue.Prod
 		}
 
 		zero := 0
-		if err := repo.UpdateBuildFields(ctx, buildID, host, "success", ptr("docker"), nil, &zero); err != nil {
+		if err := repo.UpdateBuildFields(ctx, buildID, host, "success", &detected, nil, &zero); err != nil {
 			return err
 		}
 
@@ -185,15 +189,6 @@ func buildHandler(pool *pgxpool.Pool, cfg config.Config, prod platformqueue.Prod
 	}
 }
 
-func dockerfile(rc json.RawMessage) string {
-	var m map[string]any
-	_ = json.Unmarshal(rc, &m)
-	if v, ok := m["dockerfile_path"].(string); ok && strings.TrimSpace(v) != "" {
-		return strings.TrimSpace(v)
-	}
-	return "Dockerfile"
-}
-
 func listen(rt json.RawMessage) int {
 	var m map[string]any
 	_ = json.Unmarshal(rt, &m)
@@ -205,8 +200,6 @@ func listen(rt json.RawMessage) int {
 	}
 	return 8080
 }
-
-func ptr(s string) *string { return &s }
 
 func shorten(s string) string {
 	s = strings.TrimSpace(s)

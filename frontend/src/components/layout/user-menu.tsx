@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogOut, Settings, User as UserIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,8 @@ import {
 import { useAuthStore } from "@/stores/auth-store";
 
 export function UserMenu() {
+  const t = useTranslations("userMenu");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -23,7 +26,7 @@ export function UserMenu() {
   if (!user) {
     return (
       <Button asChild size="sm" variant="ghost">
-        <Link href="/login">Sign in</Link>
+        <Link href="/login">{t("signIn")}</Link>
       </Button>
     );
   }
@@ -56,7 +59,7 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col gap-0 normal-case tracking-normal">
           <span className="text-sm font-medium text-foreground">
-            {user.display_name || "Operator"}
+            {user.display_name || tCommon("operator")}
           </span>
           <span className="truncate text-xs font-normal text-muted-foreground">
             {user.email}
@@ -65,17 +68,17 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/settings">
-            <UserIcon /> Profile
+            <UserIcon /> {t("profile")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings">
-            <Settings /> Settings
+            <Settings /> {t("settings")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive">
-          <LogOut /> Sign out
+          <LogOut /> {t("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

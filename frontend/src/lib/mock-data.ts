@@ -1,7 +1,6 @@
 /**
- * Mock fixtures used by every page that lacks a real backend implementation
- * (Phase 2+). Hooks call back into these as their `queryFn`, so when the
- * backend ships the swap is one line per hook.
+ * Mock fixtures for demos and unit-style stories. Prefer live hooks (`use-*`) in
+ * dashboard routes — several global pages no longer import this file.
  */
 
 import type {

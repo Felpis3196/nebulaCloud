@@ -582,6 +582,27 @@ type DeploymentRow struct {
 	FinishedAt   *time.Time
 }
 
+// HasRecentWebhookDeployment reports whether the same service already has a
+// webhook-triggered deployment for this commit SHA within the lookback window.
+func (r *Repository) HasRecentWebhookDeployment(ctx context.Context, serviceID uuid.UUID, commitSHA string, notBefore time.Time) (bool, error) {
+	if strings.TrimSpace(commitSHA) == "" {
+		return false, nil
+	}
+	const q = `
+		SELECT EXISTS(
+			SELECT 1 FROM deployments
+			WHERE service_id = $1
+			  AND trigger = 'webhook'
+			  AND commit_sha = $2
+			  AND created_at > $3
+		)`
+	var exists bool
+	if err := r.pool.QueryRow(ctx, q, serviceID, commitSHA, notBefore).Scan(&exists); err != nil {
+		return false, platformerrors.Internal("webhook dedupe lookup").WithCause(err)
+	}
+	return exists, nil
+}
+
 func (r *Repository) InsertDeployment(ctx context.Context, svcID uuid.UUID, userID *uuid.UUID, trigger string) (uuid.UUID, error) {
 	id := uuid.New()
 	const q = `

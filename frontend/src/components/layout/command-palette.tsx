@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 import {
   BarChart3,
   Cloud,
@@ -28,13 +29,10 @@ import {
 } from "@/components/ui/command";
 import { useAuthStore } from "@/stores/auth-store";
 
-/**
- * Global cmd-K palette. Lists every dashboard route plus quick actions.
- *
- * Phase 6 will extend with project/service/deployment search by hitting the
- * backend; the surface is ready for it.
- */
 export function CommandPalette() {
+  const t = useTranslations("command");
+  const tNav = useTranslations("nav");
+  const tTheme = useTranslations("theme");
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const { setTheme, resolvedTheme } = useTheme();
@@ -72,50 +70,50 @@ export function CommandPalette() {
         className="hidden h-8 gap-2 bg-secondary/30 px-2.5 text-muted-foreground md:inline-flex"
         onClick={() => setOpen(true)}
       >
-        <span className="text-xs">Search...</span>
+        <span className="text-xs">{t("search")}</span>
         <kbd className="ml-2 hidden rounded border border-border/60 bg-card/40 px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
           ⌘K
         </kbd>
       </Button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search projects, deployments, settings..." />
+        <CommandInput placeholder={t("placeholder")} />
         <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Navigate">
+          <CommandEmpty>{t("empty")}</CommandEmpty>
+          <CommandGroup heading={t("navigate")}>
             <CommandItem onSelect={go("/dashboard")}>
-              <LayoutDashboard /> Overview
+              <LayoutDashboard /> {tNav("overview")}
             </CommandItem>
             <CommandItem onSelect={go("/projects")}>
-              <FolderGit2 /> Projects
+              <FolderGit2 /> {tNav("projects")}
             </CommandItem>
             <CommandItem onSelect={go("/deployments")}>
-              <Cloud /> Deployments
+              <Cloud /> {tNav("deployments")}
             </CommandItem>
             <CommandItem onSelect={go("/logs")}>
-              <Terminal /> Logs
+              <Terminal /> {tNav("logs")}
             </CommandItem>
             <CommandItem onSelect={go("/metrics")}>
-              <BarChart3 /> Metrics
+              <BarChart3 /> {tNav("metrics")}
             </CommandItem>
             <CommandItem onSelect={go("/domains")}>
-              <Globe /> Domains
+              <Globe /> {tNav("domains")}
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />
-          <CommandGroup heading="Account">
+          <CommandGroup heading={t("account")}>
             <CommandItem onSelect={go("/settings")}>
-              <Settings /> Settings
+              <Settings /> {tNav("settings")}
             </CommandItem>
             <CommandItem
               onSelect={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             >
               {resolvedTheme === "dark" ? <Sun /> : <Moon />}
-              Toggle theme
+              {tTheme("toggle")}
               <CommandShortcut>⇧⌘L</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={handleLogout}>
-              <LogOut /> Sign out
+              <LogOut /> {t("signOut")}
             </CommandItem>
           </CommandGroup>
         </CommandList>

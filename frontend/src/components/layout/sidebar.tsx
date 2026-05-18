@@ -12,29 +12,32 @@ import {
   Settings,
   Terminal,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: "overview" | "projects" | "deployments" | "logs" | "metrics" | "domains";
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
 }
 
 const NAV_PRIMARY: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/projects", label: "Projects", icon: FolderGit2 },
-  { href: "/deployments", label: "Deployments", icon: Cloud },
+  { href: "/dashboard", labelKey: "overview", icon: LayoutDashboard },
+  { href: "/projects", labelKey: "projects", icon: FolderGit2 },
+  { href: "/deployments", labelKey: "deployments", icon: Cloud },
 ];
 
 const NAV_INFRA: NavItem[] = [
-  { href: "/logs", label: "Logs", icon: Terminal },
-  { href: "/metrics", label: "Metrics", icon: BarChart3 },
-  { href: "/domains", label: "Domains", icon: Globe },
+  { href: "/logs", labelKey: "logs", icon: Terminal },
+  { href: "/metrics", labelKey: "metrics", icon: BarChart3 },
+  { href: "/domains", labelKey: "domains", icon: Globe },
 ];
 
 export function Sidebar() {
+  const t = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const pathname = usePathname();
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
@@ -47,22 +50,32 @@ export function Sidebar() {
         </div>
         <span className="text-sm font-semibold tracking-tight">NebulaCloud</span>
         <Badge variant="muted" className="ml-auto px-1.5 py-0 text-[10px]">
-          Beta
+          {tCommon("beta")}
         </Badge>
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
-        <SectionLabel>Workspace</SectionLabel>
+        <SectionLabel>{t("workspace")}</SectionLabel>
         <ul className="space-y-0.5">
           {NAV_PRIMARY.map((item) => (
-            <NavRow key={item.href} {...item} active={isActive(item.href)} />
+            <NavRow
+              key={item.href}
+              {...item}
+              label={t(item.labelKey)}
+              active={isActive(item.href)}
+            />
           ))}
         </ul>
 
-        <SectionLabel>Operate</SectionLabel>
+        <SectionLabel>{t("operate")}</SectionLabel>
         <ul className="space-y-0.5">
           {NAV_INFRA.map((item) => (
-            <NavRow key={item.href} {...item} active={isActive(item.href)} />
+            <NavRow
+              key={item.href}
+              {...item}
+              label={t(item.labelKey)}
+              active={isActive(item.href)}
+            />
           ))}
         </ul>
       </nav>
@@ -78,11 +91,11 @@ export function Sidebar() {
           )}
         >
           <Settings className="h-4 w-4" />
-          Settings
+          {t("settings")}
         </Link>
         <div className="mt-3 flex items-center gap-2 rounded-md bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
           <Activity className="h-3 w-3 text-success" />
-          All systems normal
+          {t("allSystemsNormal")}
         </div>
       </div>
     </aside>
@@ -103,7 +116,7 @@ function NavRow({
   icon: Icon,
   badge,
   active,
-}: NavItem & { active: boolean }) {
+}: Omit<NavItem, "labelKey"> & { label: string; active: boolean }) {
   return (
     <li>
       <Link

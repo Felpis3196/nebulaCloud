@@ -12,8 +12,10 @@ import { ConnectRepoDialog } from "@/components/projects/connect-repo-dialog";
 import { useProject } from "@/hooks/use-project";
 import { useServices } from "@/hooks/use-services";
 import { api, ApiError } from "@/lib/api-client";
+import { useTranslations } from "next-intl";
 
 export default function ProjectLayout({ children }: { children: ReactNode }) {
+  const t = useTranslations("projects.detail");
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = typeof params?.id === "string" ? params.id : "";
@@ -26,14 +28,14 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
   }
 
   if (!id) {
-    return <p className="text-sm text-muted-foreground">Missing project.</p>;
+    return <p className="text-sm text-muted-foreground">{t("missingProject")}</p>;
   }
 
   if (isLoading || !project) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading project…
+        {t("loadingProject")}
       </div>
     );
   }
@@ -41,16 +43,16 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
   async function deployNow() {
     const first = services[0];
     if (!first) {
-      toast.message("Add a service from the overview first.");
+      toast.message(t("addServiceFirst"));
       router.push(`/projects/${id}`);
       return;
     }
     try {
       await api(`/api/v1/services/${first.id}/deployments`, { method: "POST", body: {} });
-      toast.success("Deployment queued.");
+      toast.success(t("deployQueued"));
       router.push(`/projects/${id}/deployments`);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Deploy failed");
+      toast.error(e instanceof ApiError ? e.message : t("deployFailed"));
     }
   }
 
@@ -62,7 +64,7 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
             href="/projects"
             className="text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
-            ← All projects
+            {t("allProjects")}
           </Link>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
@@ -88,16 +90,16 @@ export default function ProjectLayout({ children }: { children: ReactNode }) {
               <GitBranch className="h-3 w-3" />
               <span className="font-mono">{project.default_branch}</span>
             </span>
-            <Badge variant="muted">{project.services_count} services</Badge>
+            <Badge variant="muted">{t("servicesCount", { count: project.services_count })}</Badge>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/projects/${id}/settings`}>Configure</Link>
+            <Link href={`/projects/${id}/settings`}>{t("configure")}</Link>
           </Button>
           <ConnectRepoDialog projectId={id} />
           <Button variant="gradient" size="sm" onClick={() => void deployNow()}>
-            Deploy now
+            {t("deployNow")}
           </Button>
         </div>
       </header>

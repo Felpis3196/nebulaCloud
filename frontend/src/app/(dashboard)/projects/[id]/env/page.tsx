@@ -24,8 +24,12 @@ import { useEnvVars } from "@/hooks/use-env-vars";
 import { api, ApiError } from "@/lib/api-client";
 import type { EnvVar } from "@/types/api";
 import { relativeTime } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export default function ProjectEnvPage() {
+  const t = useTranslations("projects.env");
+  const tDetail = useTranslations("projects.detail");
+  const tCommon = useTranslations("common");
   const params = useParams<{ id: string }>();
   const projectId = typeof params?.id === "string" ? params.id : "";
   const qc = useQueryClient();
@@ -49,13 +53,13 @@ export default function ProjectEnvPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["env-vars", serviceId] });
-      toast.success("Variable saved.");
+      toast.success(t("saved"));
       setNewKey("");
       setNewVal("");
       setNewSecret(false);
     },
     onError: (e: Error) => {
-      toast.error(e instanceof ApiError ? e.message : "Could not add variable");
+      toast.error(e instanceof ApiError ? e.message : t("addFailed"));
     },
   });
 
@@ -67,10 +71,10 @@ export default function ProjectEnvPage() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["env-vars", serviceId] });
-      toast.success("Variable removed.");
+      toast.success(t("removed"));
     },
     onError: (e: Error) => {
-      toast.error(e instanceof ApiError ? e.message : "Could not delete variable");
+      toast.error(e instanceof ApiError ? e.message : t("deleteFailed"));
     },
   });
 
@@ -83,7 +87,7 @@ export default function ProjectEnvPage() {
     if (!serviceId) return;
     const k = newKey.trim();
     if (!k) {
-      toast.error("Key is required.");
+      toast.error(t("keyRequired"));
       return;
     }
     addMutation.mutate({ key: k, value: newVal, is_secret: newSecret });
@@ -95,24 +99,22 @@ export default function ProjectEnvPage() {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
         <div>
-          <CardTitle>Environment variables</CardTitle>
-          <CardDescription>
-            Sealed at rest with AES-256-GCM. Scoped per service; pick a service to edit its env.
-          </CardDescription>
+          <CardTitle>{t("envVarsTitle")}</CardTitle>
+          <CardDescription>{t("envVarsDesc")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-6 px-0 pb-0">
         <div className="flex flex-wrap items-end gap-3 px-6">
           <div className="space-y-2">
-            <Label>Service</Label>
+            <Label>{tCommon("service")}</Label>
             {svcLoading ? (
-              <p className="text-sm text-muted-foreground">Loading services…</p>
+              <p className="text-sm text-muted-foreground">{t("loadingServices")}</p>
             ) : services.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Add a service from the overview first.</p>
+              <p className="text-sm text-muted-foreground">{tDetail("addServiceFirst")}</p>
             ) : (
               <Select value={serviceId} onValueChange={setServiceId}>
                 <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Service" />
+                  <SelectValue placeholder={tCommon("service")} />
                 </SelectTrigger>
                 <SelectContent>
                   {services.map((s) => (
@@ -130,30 +132,30 @@ export default function ProjectEnvPage() {
           <>
             <form onSubmit={addVar} className="grid gap-3 border-y border-border/60 bg-muted/20 px-6 py-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
               <div className="space-y-2">
-                <Label htmlFor="env-key">Key</Label>
+                <Label htmlFor="env-key">{t("key")}</Label>
                 <Input
                   id="env-key"
                   className="font-mono text-sm"
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
-                  placeholder="DATABASE_URL"
+                  placeholder={t("keyPlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="env-val">Value</Label>
+                <Label htmlFor="env-val">{t("value")}</Label>
                 <Input
                   id="env-val"
                   className="font-mono text-sm"
                   type={newSecret ? "password" : "text"}
                   value={newVal}
                   onChange={(e) => setNewVal(e.target.value)}
-                  placeholder="value"
+                  placeholder={t("valuePlaceholder")}
                 />
               </div>
               <div className="flex items-center gap-2 pb-2">
                 <Switch id="env-secret" checked={newSecret} onCheckedChange={setNewSecret} />
                 <Label htmlFor="env-secret" className="text-sm font-normal">
-                  Secret
+                  {t("secret")}
                 </Label>
               </div>
               <Button type="submit" size="sm" variant="gradient" disabled={addMutation.isPending}>
@@ -161,22 +163,22 @@ export default function ProjectEnvPage() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <Plus className="h-4 w-4" /> Add
+                    <Plus className="h-4 w-4" /> {t("add")}
                   </>
                 )}
               </Button>
             </form>
 
             {loading ? (
-              <p className="px-6 text-sm text-muted-foreground">Loading variables…</p>
+              <p className="px-6 text-sm text-muted-foreground">{t("loadingVariables")}</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Key</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Updated</TableHead>
+                    <TableHead>{t("key")}</TableHead>
+                    <TableHead>{t("value")}</TableHead>
+                    <TableHead>{t("type")}</TableHead>
+                    <TableHead>{t("updated")}</TableHead>
                     <TableHead className="w-[72px]" />
                   </TableRow>
                 </TableHeader>
@@ -194,9 +196,9 @@ export default function ProjectEnvPage() {
                       </TableCell>
                       <TableCell>
                         {v.is_secret ? (
-                          <Badge variant="warning">secret</Badge>
+                          <Badge variant="warning">{t("secretBadge")}</Badge>
                         ) : (
-                          <Badge variant="muted">plain</Badge>
+                          <Badge variant="muted">{t("plain")}</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
@@ -207,7 +209,7 @@ export default function ProjectEnvPage() {
                           variant="ghost"
                           size="icon"
                           type="button"
-                          aria-label="Remove variable"
+                          aria-label={t("removeAria")}
                           disabled={deleteMutation.isPending}
                           onClick={() => deleteMutation.mutate(v.key)}
                         >
@@ -220,7 +222,7 @@ export default function ProjectEnvPage() {
               </Table>
             )}
             {vars.length === 0 && !loading && (
-              <p className="px-6 pb-4 text-sm text-muted-foreground">No variables for this service yet.</p>
+              <p className="px-6 pb-4 text-sm text-muted-foreground">{t("noVariables")}</p>
             )}
           </>
         )}

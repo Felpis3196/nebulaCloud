@@ -12,8 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useProject } from "@/hooks/use-project";
 import { api, ApiError } from "@/lib/api-client";
 import type { Project } from "@/types/api";
+import { useTranslations } from "next-intl";
 
 export default function ProjectSettingsPage() {
+  const t = useTranslations("projects.settings");
+  const tCommon = useTranslations("common");
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === "string" ? params.id : "";
   const qc = useQueryClient();
@@ -50,42 +53,39 @@ export default function ProjectSettingsPage() {
       await api<Project>(`/api/v1/projects/${id}`, { method: "PATCH", body });
       await qc.invalidateQueries({ queryKey: ["project", id] });
       await qc.invalidateQueries({ queryKey: ["projects"] });
-      toast.success("Project updated.");
+      toast.success(t("updated"));
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Save failed");
+      toast.error(err instanceof ApiError ? err.message : t("saveFailed"));
     } finally {
       setSaving(false);
     }
   }
 
   if (isLoading || !project) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return <p className="text-sm text-muted-foreground">{tCommon("loading")}</p>;
   }
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>
-            Update display name, description, repository URL, and default branch. Slug stays fixed
-            after creation.
-          </CardDescription>
+          <CardTitle>{t("general")}</CardTitle>
+          <CardDescription>{t("generalDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={save} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("name")}</Label>
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="branch">Default branch</Label>
+                <Label htmlFor="branch">{t("defaultBranch")}</Label>
                 <Input id="branch" value={branch} onChange={(e) => setBranch(e.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="repo">Repository URL</Label>
+              <Label htmlFor="repo">{t("repoUrl")}</Label>
               <Input
                 id="repo"
                 value={repoUrl}
@@ -94,12 +94,12 @@ export default function ProjectSettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="desc">Description</Label>
+              <Label htmlFor="desc">{t("description")}</Label>
               <Input id="desc" value={desc} onChange={(e) => setDesc(e.target.value)} />
             </div>
             <div className="flex justify-end">
               <Button type="submit" variant="gradient" size="sm" disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? t("saving") : t("save")}
               </Button>
             </div>
           </form>
@@ -108,15 +108,12 @@ export default function ProjectSettingsPage() {
 
       <Card className="border-destructive/40">
         <CardHeader>
-          <CardTitle className="text-destructive">Danger zone</CardTitle>
-          <CardDescription>
-            Delete this project and all of its services, deployments, and audit history. API support
-            is not implemented yet.
-          </CardDescription>
+          <CardTitle className="text-destructive">{t("dangerZone")}</CardTitle>
+          <CardDescription>{t("dangerDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="destructive" size="sm" type="button" disabled title="Coming in a later release">
-            <Trash2 className="h-4 w-4" /> Delete project
+          <Button variant="destructive" size="sm" type="button" disabled title={tCommon("comingSoon")}>
+            <Trash2 className="h-4 w-4" /> {t("deleteProject")}
           </Button>
         </CardContent>
       </Card>

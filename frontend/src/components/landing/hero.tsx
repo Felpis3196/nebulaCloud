@@ -1,13 +1,17 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Github } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { TerminalMockup } from "@/components/landing/terminal-mockup";
 import { env } from "@/lib/env";
 
 export function Hero() {
+  const t = useTranslations("landing");
+
   return (
     <section className="relative overflow-hidden border-b border-border/40 pb-24 pt-20 sm:pb-32 sm:pt-28">
-      {/* Background gradient */}
       <div
         aria-hidden
         className="absolute inset-0 -z-10"
@@ -29,42 +33,38 @@ export function Hero() {
             className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/40 px-3 py-1 text-xs text-muted-foreground backdrop-blur-md transition-colors hover:border-border hover:text-foreground"
           >
             <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-success">
-              New
+              {t("badgeNew")}
             </span>
-            Self-hosted, single binary, MIT-licensed
+            {t("badgeText")}
             <ArrowRight className="h-3 w-3" />
           </Link>
 
           <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-6xl">
-            <span className="text-gradient">Deploy from Git</span>
+            <span className="text-gradient">{t("heroTitle1")}</span>
             <br />
-            <span className="text-foreground">in seconds.</span>
+            <span className="text-foreground">{t("heroTitle2")}</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-balance text-base leading-relaxed text-muted-foreground sm:text-lg">
-            NebulaCloud is a self-hosted PaaS in the spirit of Railway, Render, and Heroku.
-            Connect a repo, ship a container, get realtime logs, metrics, and a polished
-            dashboard — all on infrastructure you control.
+            {t("heroSubtitle")}
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="xl" variant="gradient">
               <Link href="/register">
-                Start deploying
+                {t("startDeploying")}
                 <ArrowRight />
               </Link>
             </Button>
             <Button asChild size="xl" variant="outline">
               <a href={env.NEXT_PUBLIC_GITHUB_URL} target="_blank" rel="noreferrer">
                 <Github className="h-4 w-4" />
-                View source
+                {t("viewSource")}
               </a>
             </Button>
           </div>
 
-          <p className="mt-4 text-xs text-muted-foreground">
-            Free to self-host. No credit card. Boots on Docker Compose in under a minute.
-          </p>
+          <p className="mt-4 text-xs text-muted-foreground">{t("heroFootnote")}</p>
         </div>
 
         <div className="mx-auto mt-16 max-w-4xl">
@@ -74,3 +74,4 @@ export function Hero() {
     </section>
   );
 }
+

@@ -1,25 +1,50 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { DeploymentStatus, ServiceStatus, SslStatus } from "@/types/api";
 
 type AnyStatus = DeploymentStatus | ServiceStatus | SslStatus;
 
-const TONES: Record<string, { dot: string; ring: string; text: string; label: string }> = {
-  running: { dot: "bg-success", ring: "bg-success/15", text: "text-success", label: "Running" },
-  issued: { dot: "bg-success", ring: "bg-success/15", text: "text-success", label: "Issued" },
-  building: { dot: "bg-warning", ring: "bg-warning/15", text: "text-warning", label: "Building" },
-  pushing: { dot: "bg-warning", ring: "bg-warning/15", text: "text-warning", label: "Pushing" },
-  deploying: { dot: "bg-info", ring: "bg-info/15", text: "text-info", label: "Deploying" },
-  queued: { dot: "bg-muted-foreground", ring: "bg-muted/40", text: "text-muted-foreground", label: "Queued" },
-  pending: { dot: "bg-warning", ring: "bg-warning/15", text: "text-warning", label: "Pending" },
-  failed: { dot: "bg-destructive", ring: "bg-destructive/15", text: "text-destructive", label: "Failed" },
-  canceled: { dot: "bg-muted-foreground", ring: "bg-muted/40", text: "text-muted-foreground", label: "Canceled" },
-  rolled_back: { dot: "bg-info", ring: "bg-info/15", text: "text-info", label: "Rolled back" },
-  idle: { dot: "bg-muted-foreground/60", ring: "bg-muted/40", text: "text-muted-foreground", label: "Idle" },
-  stopped: { dot: "bg-muted-foreground/60", ring: "bg-muted/40", text: "text-muted-foreground", label: "Stopped" },
-  disabled: { dot: "bg-muted-foreground/60", ring: "bg-muted/40", text: "text-muted-foreground", label: "Disabled" },
+const TONE_CLASSES: Record<string, { dot: string; ring: string; text: string }> = {
+  running: { dot: "bg-success", ring: "bg-success/15", text: "text-success" },
+  issued: { dot: "bg-success", ring: "bg-success/15", text: "text-success" },
+  building: { dot: "bg-warning", ring: "bg-warning/15", text: "text-warning" },
+  pushing: { dot: "bg-warning", ring: "bg-warning/15", text: "text-warning" },
+  deploying: { dot: "bg-info", ring: "bg-info/15", text: "text-info" },
+  queued: { dot: "bg-muted-foreground", ring: "bg-muted/40", text: "text-muted-foreground" },
+  pending: { dot: "bg-warning", ring: "bg-warning/15", text: "text-warning" },
+  failed: { dot: "bg-destructive", ring: "bg-destructive/15", text: "text-destructive" },
+  canceled: { dot: "bg-muted-foreground", ring: "bg-muted/40", text: "text-muted-foreground" },
+  rolled_back: { dot: "bg-info", ring: "bg-info/15", text: "text-info" },
+  idle: { dot: "bg-muted-foreground/60", ring: "bg-muted/40", text: "text-muted-foreground" },
+  stopped: { dot: "bg-muted-foreground/60", ring: "bg-muted/40", text: "text-muted-foreground" },
+  disabled: { dot: "bg-muted-foreground/60", ring: "bg-muted/40", text: "text-muted-foreground" },
 };
 
 const PULSING = new Set(["building", "pushing", "deploying", "queued", "pending"]);
+
+const STATUS_KEYS = [
+  "running",
+  "issued",
+  "building",
+  "pushing",
+  "deploying",
+  "queued",
+  "pending",
+  "failed",
+  "canceled",
+  "rolled_back",
+  "idle",
+  "stopped",
+  "disabled",
+] as const;
+
+type StatusKey = (typeof STATUS_KEYS)[number];
+
+function isStatusKey(value: string): value is StatusKey {
+  return (STATUS_KEYS as readonly string[]).includes(value);
+}
 
 export function StatusPill({
   status,
@@ -28,8 +53,11 @@ export function StatusPill({
   status: AnyStatus | string;
   className?: string;
 }) {
-  const tone = TONES[status] ?? TONES.idle!;
+  const t = useTranslations("status");
+  const tone = TONE_CLASSES[status] ?? TONE_CLASSES.idle!;
+  const label = isStatusKey(status) ? t(status) : t("idle");
   const animate = PULSING.has(status);
+
   return (
     <span
       className={cn(
@@ -49,7 +77,7 @@ export function StatusPill({
         />
         <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", tone.dot)} />
       </span>
-      {tone.label}
+      {label}
     </span>
   );
 }

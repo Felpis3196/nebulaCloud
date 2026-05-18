@@ -18,8 +18,12 @@ import { useProjects } from "@/hooks/use-projects";
 import { useOrganizationStore } from "@/stores/org-store";
 import { api } from "@/lib/api-client";
 import type { Organization } from "@/types/api";
+import { useTranslations } from "next-intl";
 
 export default function ProjectsPage() {
+  const t = useTranslations("dashboard.projects");
+  const tNav = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const { data: orgs = [], isLoading: orgLoading } = useOrganizations();
   const selected = useOrganizationStore((s) => s.selectedOrganizationId);
   const setOrg = useOrganizationStore((s) => s.setSelectedOrganizationId);
@@ -73,17 +77,15 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-3">
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground">
-            Group services that share a repo, secrets, and team.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
           {!orgLoading && orgs.length > 0 && (
             <Select
               value={selected ?? undefined}
               onValueChange={(v) => setOrg(v)}
             >
               <SelectTrigger className="w-64">
-                <SelectValue placeholder="Organization" />
+                <SelectValue placeholder={t("organization")} />
               </SelectTrigger>
               <SelectContent>
                 {orgs.map((o) => (
@@ -97,25 +99,25 @@ export default function ProjectsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <Link href="/deployments">Deployments</Link>
+            <Link href="/deployments">{tNav("deployments")}</Link>
           </Button>
           {orgs.length === 0 ? (
-            <Button onClick={bootstrapOrg}>Create default org</Button>
+            <Button onClick={bootstrapOrg}>{t("bootstrap")}</Button>
           ) : (
             <>
               {!creating ? (
                 <Button variant="secondary" onClick={() => setCreating(true)}>
-                  New org
+                  {t("newOrg")}
                 </Button>
               ) : (
                 <form onSubmit={createOrgFromForm} className="flex flex-wrap gap-2">
-                  <Input placeholder="slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
-                  <Input placeholder="name" value={name} onChange={(e) => setName(e.target.value)} />
-                  <Button type="submit">Save</Button>
+                  <Input placeholder={t("slug")} value={slug} onChange={(e) => setSlug(e.target.value)} />
+                  <Input placeholder={t("orgName")} value={name} onChange={(e) => setName(e.target.value)} />
+                  <Button type="submit">{tCommon("save")}</Button>
                 </form>
               )}
               <Button variant="outline" disabled={!selected} onClick={createDemoProject}>
-                New demo project
+                {t("demoProject")}
               </Button>
             </>
           )}
@@ -123,12 +125,12 @@ export default function ProjectsPage() {
       </header>
 
       {orgLoading || projLoading ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{tCommon("loading")}</div>
       ) : !selected ? (
         <ProjectsEmptyState />
       ) : projects.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No projects yet — add a starter project above.
+          {t("noProjectsYet")}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

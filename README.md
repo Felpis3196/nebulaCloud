@@ -14,13 +14,15 @@ This repository is being built incrementally following the roadmap in [`docs/ARC
 | 1     | Identity (auth, RBAC, audit)       | done   |
 | 1.5   | Frontend Phase 1 (dashboard MVP)   | done   |
 | 2     | Projects, services, env vars       | done   |
-| 3     | GitHub App + webhooks              | in progress (prep)   |
-| 4     | Build pipeline (Buildpacks)        | todo   |
-| 5     | Runtime agent + Traefik            | todo   |
+| 3     | GitHub App + webhooks              | done (manual install link + push webhook)   |
+| 4     | Build pipeline (Buildpacks)        | done (Dockerfile or Paketo `pack`)   |
+| 5     | Runtime agent + Traefik            | done (Docker labels + replace-in-place; see ARCHITECTURE)   |
 | 6     | Logs / metrics streaming           | todo   |
 | 7     | Custom domains + ACME              | todo   |
 | 8     | Web terminal                       | todo   |
 | 9     | Hardening, tests, polish           | todo   |
+
+**Local MVP notes:** the runtime agent runs user containers on `nebula_platform` (shared with Traefik’s Docker provider) and replaces the previous container per service on each deploy. The compose file also defines `nebula_apps` for a future split where only workloads join that network. Some dashboard routes (global overview, workspace metrics, domains) stay minimal or illustrative until later phases—project-scoped pages hit the live API.
 
 ## High-level architecture
 
@@ -92,6 +94,8 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for full details, sequence di
 git clone <this repo> nebula-cloud
 cd nebula-cloud
 
+# Optional: copy to `.env` to override defaults (JWT, secrets, Postgres password).
+# `docker compose` loads `.env.example` from the repo first; a local `.env` is merged when present.
 cp .env.example .env
 # edit .env — at minimum rotate NEBULA_JWT_SECRET, NEBULA_SECRETS_KEY,
 # NEBULA_PASSWORD_PEPPER and POSTGRES_PASSWORD.

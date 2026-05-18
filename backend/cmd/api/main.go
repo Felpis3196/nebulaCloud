@@ -267,7 +267,7 @@ func newRouter(
 			httpx.OK(w, map[string]any{
 				"name":    "NebulaCloud API",
 				"version": buildVersion(),
-				"phase":   "2–3 — workspace + GitHub prep",
+				"phase":   "3 — workspace + GitHub webhooks",
 				"docs":    "/api/v1/openapi.yaml",
 			})
 		})

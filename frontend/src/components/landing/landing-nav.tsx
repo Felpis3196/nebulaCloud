@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { Cloud, Github } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { env } from "@/lib/env";
 
 export function LandingNav() {
+  const t = useTranslations("landing");
+
   return (
     <header className="sticky top-0 z-30 border-b border-border/40 bg-background/70 backdrop-blur-md">
       <div className="container flex h-14 items-center justify-between">
@@ -18,10 +22,10 @@ export function LandingNav() {
 
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           <Link href="#features" className="transition-colors hover:text-foreground">
-            Features
+            {t("features")}
           </Link>
           <Link href="#how" className="transition-colors hover:text-foreground">
-            How it works
+            {t("howItWorks")}
           </Link>
           <a
             href={env.NEXT_PUBLIC_GITHUB_URL}
@@ -29,22 +33,23 @@ export function LandingNav() {
             rel="noreferrer"
             className="transition-colors hover:text-foreground"
           >
-            GitHub
+            {t("github")}
           </a>
         </nav>
 
         <div className="flex items-center gap-2">
+          <LocaleSwitcher />
           <Button asChild variant="ghost" size="sm">
             <a href={env.NEXT_PUBLIC_GITHUB_URL} target="_blank" rel="noreferrer">
               <Github className="h-4 w-4" />
-              <span className="hidden sm:inline">Star on GitHub</span>
+              <span className="hidden sm:inline">{t("starOnGithub")}</span>
             </a>
           </Button>
           <Button asChild size="sm" variant="ghost">
-            <Link href="/login">Sign in</Link>
+            <Link href="/login">{t("signIn")}</Link>
           </Button>
           <Button asChild size="sm" variant="gradient">
-            <Link href="/register">Get started</Link>
+            <Link href="/register">{t("getStarted")}</Link>
           </Button>
         </div>
       </div>
