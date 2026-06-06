@@ -92,6 +92,27 @@ func Migrate(dsn, sourcePath string) error {
 	return nil
 }
 
+// MigrateDown rolls back exactly one migration version.
+func MigrateDown(dsn, sourcePath string) error {
+	if dsn == "" {
+		return errors.New("database: migrate: empty DSN")
+	}
+	if sourcePath == "" {
+		sourcePath = "file://migrations"
+	} else if len(sourcePath) > 7 && sourcePath[:7] != "file://" {
+		sourcePath = "file://" + sourcePath
+	}
+	m, err := migrate.New(sourcePath, dsn)
+	if err != nil {
+		return fmt.Errorf("database: migrate init: %w", err)
+	}
+	defer func() { _, _ = m.Close() }()
+	if err := m.Steps(-1); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("database: migrate down: %w", err)
+	}
+	return nil
+}
+
 // PingHealth implements the platform/observability.HealthChecker contract
 // against a live pool.
 type PingHealth struct {

@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import { api } from "@/lib/api-client";
 import { clearTokens, persistTokens, readPersistedUser } from "@/lib/auth";
+import { ensurePersonalOrganization } from "@/lib/ensure-organization";
+import { useOrganizationStore } from "@/stores/org-store";
 import type { TokenPair, User } from "@/types/api";
 
 interface AuthState {
@@ -39,6 +41,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       persistTokens(pair);
       set({ user: pair.user });
+      await ensurePersonalOrganization();
       return pair.user;
     } finally {
       set({ isAuthenticating: false });
@@ -61,6 +64,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       persistTokens(pair);
       set({ user: pair.user });
+      await ensurePersonalOrganization();
       return pair.user;
     } finally {
       set({ isAuthenticating: false });
@@ -86,6 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       /* best effort */
     } finally {
       clearTokens();
+      useOrganizationStore.getState().setSelectedOrganizationId(null);
       set({ user: null });
     }
   },

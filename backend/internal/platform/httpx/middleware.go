@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -192,18 +193,39 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func clientIP(r *http.Request) string {
+// ClientIP returns a Postgres-compatible IP (no port). RemoteAddr is often "ip:port",
+// which breaks INET columns when persisting sessions.
+func ClientIP(r *http.Request) string {
+	var raw string
 	if v := r.Header.Get("X-Forwarded-For"); v != "" {
 		if i := strings.IndexByte(v, ','); i > 0 {
-			return strings.TrimSpace(v[:i])
+			raw = strings.TrimSpace(v[:i])
+		} else {
+			raw = strings.TrimSpace(v)
 		}
-		return strings.TrimSpace(v)
+	} else if v := r.Header.Get("X-Real-Ip"); v != "" {
+		raw = strings.TrimSpace(v)
+	} else {
+		raw = strings.TrimSpace(r.RemoteAddr)
 	}
-	if v := r.Header.Get("X-Real-Ip"); v != "" {
-		return v
-	}
-	return r.RemoteAddr
+	return normalizeIP(raw)
 }
+
+func normalizeIP(hostport string) string {
+	if hostport == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(hostport); err == nil {
+		return host
+	}
+	// Bare IP or unusual format — validate; invalid → empty (stored as NULL).
+	if ip := net.ParseIP(hostport); ip != nil {
+		return ip.String()
+	}
+	return ""
+}
+
+func clientIP(r *http.Request) string { return ClientIP(r) }
 
 func statusBucket(code int) string {
 	switch {

@@ -12,7 +12,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -28,8 +27,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 
 	auditmod "github.com/nebulacloud/nebula/internal/modules/audit"
+	"github.com/nebulacloud/nebula/internal/platform/auth"
 	identityapp "github.com/nebulacloud/nebula/internal/modules/identity/application"
 	identityinfra "github.com/nebulacloud/nebula/internal/modules/identity/infrastructure"
 	identityif "github.com/nebulacloud/nebula/internal/modules/identity/interfaces"
@@ -40,6 +41,7 @@ import (
 	"github.com/nebulacloud/nebula/internal/platform/database"
 	platformerrors "github.com/nebulacloud/nebula/internal/platform/errors"
 	"github.com/nebulacloud/nebula/internal/platform/httpx"
+	"github.com/nebulacloud/nebula/internal/platform/logstream"
 	"github.com/nebulacloud/nebula/internal/platform/logger"
 	"github.com/nebulacloud/nebula/internal/platform/observability"
 	platformqueue "github.com/nebulacloud/nebula/internal/platform/queue"
@@ -119,6 +121,13 @@ func runServer() error {
 	}
 	defer pool.Close()
 
+	if cfg.AutoMigrate {
+		log.Info("api.migrate.auto")
+		if err := database.Migrate(cfg.Database.DSN(), "migrations"); err != nil {
+			return fmt.Errorf("auto migrate: %w", err)
+		}
+	}
+
 	redisClient, err := platformredis.Connect(ctx, platformredis.Config{
 		Addr:     cfg.Redis.Address(),
 		Password: cfg.Redis.Password,
@@ -159,7 +168,13 @@ func runServer() error {
 	if err != nil {
 		return fmt.Errorf("identity: %w", err)
 	}
-	identityHandler := identityif.NewHandler(identitySvc)
+	identityHandler := identityif.NewHandler(
+		identitySvc,
+		cfg.GitHub.ClientID,
+		cfg.GitHub.ClientSecret,
+		cfg.GitHub.OAuthRedirectURL,
+		cfg.App.URL,
+	)
 
 	sealer, err := secrets.NewAESGCMSealerFromBase64(cfg.Secrets.Key)
 	if err != nil {
@@ -169,7 +184,22 @@ func runServer() error {
 	queueProd := platformqueue.NewAsynqProducer(cfg.Redis.Address(), cfg.Redis.Password, cfg.Redis.DB)
 	defer func() { _ = queueProd.Close() }()
 	projectsSvc := projectsapp.New(projectRepo, sealer, queueProd, auditRecorder, cfg)
-	projectsHandler := projectsif.NewHandler(projectsSvc, sealer, cfg.Runtime.BaseDomain)
+	logSub := logstream.NewSubscriber(cfg.Redis.Address(), cfg.Redis.Password, cfg.Redis.DB)
+	defer func() { _ = logSub.Close() }()
+
+	projectsHandler := projectsif.NewHandler(projectsSvc, sealer, cfg.Runtime.BaseDomain, projectsif.HandlerOpts{
+		LogSubscriber: logSub,
+		VerifyToken:   identitySvc.VerifyAccessToken,
+		TerminalOn:    cfg.Terminal.Enabled,
+		AuditFn: func(ctx context.Context, actor auth.Principal, serviceID uuid.UUID, action string) {
+			uid, _ := uuid.Parse(strings.TrimSpace(actor.UserID))
+			var actorPtr *uuid.UUID
+			if uid != uuid.Nil {
+				actorPtr = &uid
+			}
+			auditRecorder.Record(ctx, action, actorPtr, map[string]any{"service_id": serviceID.String()})
+		},
+	})
 
 	// ---- HTTP router -----------------------------------------------------
 	router := newRouter(cfg, log, metrics, health, identitySvc, identityHandler, projectsHandler)
@@ -267,7 +297,7 @@ func newRouter(
 			httpx.OK(w, map[string]any{
 				"name":    "NebulaCloud API",
 				"version": buildVersion(),
-				"phase":   "3 — workspace + GitHub webhooks",
+				"phase":   "9 — logs/metrics WS, domains, terminal",
 				"docs":    "/api/v1/openapi.yaml",
 			})
 		})
@@ -326,7 +356,7 @@ func runMigrate(cfg config.Config, args []string) error {
 	case "up":
 		return database.Migrate(cfg.Database.DSN(), "migrations")
 	case "down":
-		return errors.New("migrate down: not yet exposed (phase 0); use docker exec for now")
+		return database.MigrateDown(cfg.Database.DSN(), "migrations")
 	default:
 		return fmt.Errorf("unknown migrate direction: %s", direction)
 	}

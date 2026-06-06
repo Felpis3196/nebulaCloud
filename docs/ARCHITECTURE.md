@@ -297,6 +297,6 @@ The [`runtime-agent`](../backend/cmd/runtime-agent) consumes `deploy.run` jobs a
 
 - Attaches workloads to **`nebula_platform`** so Traefik (with the mounted Docker socket) discovers containers on the same bridge network as the ingress.
 - Enforces **one active container per service**: it removes any existing containers labeled `nebula_service=<service_uuid>`, then starts a container with a **stable name** `nebula-svc-<12-char-hex>` so redeploys replace the previous instance instead of accumulating orphan containers.
-- Registers HTTP routers via **Traefik Docker labels** (no file-based `dynamic.yml` writes in this MVP).
+- Registers HTTP routers via **Traefik file provider** (`deployments/traefik/dynamic/nebula-*.yml`) and Docker labels (labels are secondary; Docker provider is flaky on Desktop).
 
 The compose file also defines **`nebula_apps`** for a future split where only user workloads attach there while the control plane stays separate. Later work: health-checked cutover, graceful drain, and rollback swap semantics as described in `DEPLOY-FLOW.md`.

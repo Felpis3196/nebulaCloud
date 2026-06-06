@@ -92,18 +92,27 @@
     "passwordPlaceholder": "••••••••••••",
     "displayNamePlaceholder": "Ada Lovelace",
     "passwordMinPlaceholder": "Pelo menos 12 caracteres",
+    "continueWithGitHub": "Continuar com GitHub",
+    "orEmail": "ou continue com e-mail",
     "validation": {
       "email": "Informe um e-mail válido",
       "passwordRequired": "Senha é obrigatória",
       "passwordMin": "Pelo menos 12 caracteres",
       "tooLong": "Muito longo",
       "passwordMismatch": "As senhas não coincidem"
+    },
+    "githubCallback": {
+      "loading": "Carregando seus repositórios GitHub…",
+      "connected": "GitHub conectado",
+      "reposFailed": "Não foi possível carregar repositórios do GitHub",
+      "oauthFailed": "Autorização GitHub falhou ({reason})"
     }
   },
   "landing": {
     "features": "Recursos",
     "howItWorks": "Como funciona",
     "github": "GitHub",
+    "sourceCode": "Código-fonte",
     "starOnGithub": "Estrela no GitHub",
     "signIn": "Entrar",
     "getStarted": "Começar",
@@ -121,8 +130,10 @@
     "footerTagline": "PaaS self-hosted para enviar aplicações containerizadas direto do Git. Construído como arquitetura de referência de portfólio.",
     "product": "Produto",
     "resources": "Recursos",
+    "readme": "README",
     "architecture": "Arquitetura",
     "security": "Segurança",
+    "contributing": "Contribuir",
     "copyright": "© {year} NebulaCloud — licença MIT.",
     "version": "v0.1.0 · Fase 1 (identidade)",
     "featuresSection": {
@@ -141,15 +152,18 @@
     },
     "featureGrid": {
       "platform": "Plataforma",
-      "title": "Tudo entre {highlight} e uma URL no ar.",
+      "titlePrefix": "Tudo entre",
       "titleHighlight": "git push",
+      "titleSuffix": "e uma URL no ar.",
       "subtitle": "Pipeline de build, runtime, ingress, observabilidade — uma experiência coesa em vez de uma stack remendada."
     },
     "howSection": {
       "label": "Como funciona",
-      "title": "De {mono} a {live} em quatro passos.",
-      "mono": "git push",
-      "live": "no ar",
+      "titlePrefix": "De",
+      "titleMono": "git push",
+      "titleMid": "a",
+      "titleLive": "no ar",
+      "titleSuffix": "em quatro passos.",
       "connectTitle": "Conecte um repositório",
       "connectBody": "Instale o GitHub App e escolha o repositório. Branch, ambiente e runtime em uma config.",
       "buildTitle": "Build automático",
@@ -186,7 +200,10 @@
       "cpuUsage": "Uso de CPU",
       "cpuDesc": "Apenas ilustrativo — use métricas do projeto para amostras da API.",
       "timelineWithProject": "Implantações do projeto “{name}” (primeiro da lista).",
-      "timelineEmpty": "Crie um projeto para ver o histórico de implantações aqui."
+      "timelineEmpty": "Crie um projeto para ver o histórico de implantações aqui.",
+      "deployCtaTitle": "Conectar um repositório GitHub",
+      "deployCtaDesc": "Abra Projetos, crie um projeto e use Conectar repositório no cabeçalho do projeto.",
+      "deployCtaButton": "Ir para projetos"
     },
     "deployments": {
       "title": "Implantações",
@@ -235,6 +252,21 @@
       "connectRepo": "Conectar repositório",
       "newOrg": "Nova org",
       "noProjectsYet": "Nenhum projeto ainda — adicione um projeto inicial acima.",
+      "noProjectsTitle": "Pronto para implantar do GitHub?",
+      "noProjectsCtaDesc": "Crie um projeto e abra o diálogo Conectar repositório para colar a URL ou escolher no GitHub.",
+      "createAndConnect": "Criar projeto e conectar GitHub",
+      "creatingProject": "Criando…",
+      "createProjectFailed": "Não foi possível criar o projeto",
+      "projectCreated": "Projeto criado",
+      "projectSlug": "Slug do projeto",
+      "projectName": "Nome do projeto",
+      "orgResynced": "A organização anterior era inválida — selecionamos outra disponível.",
+      "orgReady": "Organização pronta",
+      "createOrgFailed": "Não foi possível criar a organização",
+      "creatingOrg": "Criando org…",
+      "selectOrgFirst": "Selecione ou crie uma organização primeiro",
+      "membershipError": "Você não é membro dessa organização. Escolha outra na lista ou crie uma nova.",
+      "projectNotFound": "Projeto não encontrado — pode ter sido removido.",
       "viewProject": "Ver projeto",
       "svcCount": "{count} svc",
       "updatedAgo": "atualizado {time}"
@@ -265,6 +297,7 @@
       "description": "Vincule um repo GitHub para deploys automáticos no push. Opcionalmente registre o ID da instalação do GitHub App.",
       "repoUrl": "URL do repositório",
       "defaultBranch": "Branch padrão",
+      "defaultBranchHint": "Deve existir no repositório remoto (ex.: main ou master). Branch errada faz o clone falhar.",
       "installationId": "ID da instalação GitHub (opcional)",
       "installationHint": "Da página de instalação do GitHub App — escopa webhooks a este projeto.",
       "webhookUrl": "URL do webhook (cole no GitHub)",
@@ -274,6 +307,7 @@
       "invalidInstallation": "O ID da instalação GitHub deve ser um inteiro positivo.",
       "savedWithInstall": "Repositório e instalação GitHub salvos. Webhooks serão escopados a esta instalação.",
       "savedRepoOnly": "Repositório salvo. Adicione a URL do webhook no GitHub para deploys automáticos no push.",
+      "nextStepAddService": "Próximo passo: na Visão geral, clique em “Adicionar serviço web” e depois em Implantar agora.",
       "saveFailed": "Não foi possível salvar o repositório",
       "connectButton": "Conectar repositório",
       "dialogTitle": "Conectar um repositório",
@@ -282,7 +316,10 @@
       "webhookHint": "Use Content type application/json, secret de NEBULA_GITHUB_APP_WEBHOOK_SECRET, eventos: push.",
       "installationPlaceholder": "ex.: 12345678 — da URL de instalação do app ou API GitHub",
       "installationHintLong": "Após instalar o Nebula GitHub App na org ou repo, o GitHub mostra este id numérico na URL das configurações de instalação. Deixe em branco se corresponder apenas por URL do repositório (dev / setups simples).",
-      "repoPlaceholder": "https://github.com/sua-org/seu-repo"
+      "repoPlaceholder": "https://github.com/sua-org/seu-repo",
+      "browseGitHub": "Procurar no GitHub",
+      "pickRepo": "Repositório do GitHub",
+      "pickRepoPlaceholder": "Selecione um repositório"
     },
     "detail": {
       "addService": "Adicionar serviço",
@@ -299,6 +336,8 @@
       "allProjects": "← Todos os projetos",
       "configure": "Configurar",
       "deployNow": "Implantar agora",
+      "connectRepoFirst": "Conecte um repositório antes de implantar",
+      "deployNeedsRepo": "Conecte um repositório GitHub primeiro",
       "servicesCount": "{count} serviços",
       "missingProject": "Projeto ausente.",
       "loadingProject": "Carregando projeto…",
@@ -310,6 +349,14 @@
       "serviceCreated": "Serviço “{slug}” criado",
       "replicas": "{count} réplicas",
       "updatedAgo": "atualizado {time}"
+    },
+    "logs": {
+      "description": "O stream ao vivo abre a partir de uma implantação ou serviço.",
+      "hint": "Abra uma implantação para ver logs de build e runtime. O viewer WebSocket completo está na API de cada serviço.",
+      "openDeployments": "Ver implantações",
+      "workspaceDesc": "Busca de logs em todo o workspace não está disponível neste MVP.",
+      "workspaceHint": "Abra um projeto, escolha um serviço e use Implantações para inspecionar logs de cada release.",
+      "goProjects": "Ir para projetos"
     },
     "settings": {
       "title": "Configurações do projeto",
@@ -433,17 +480,27 @@
     "drawer": {
       "commitSection": "Commit",
       "pipeline": "Pipeline",
-      "buildLogPreview": "Prévia do log de build",
+      "buildLogPreview": "Log de build e deploy",
       "image": "Imagem",
       "viewLogs": "Ver logs",
       "rollback": "Reverter",
+      "deployFailed": "Implantação falhou",
+      "noLogsYet": "Nenhuma linha de log registrada. Inicie um novo deploy ou verifique se build-worker e runtime-agent estão em execução.",
+      "noLogsCheckWorkers": "Nenhum log de build foi capturado. Veja docker compose logs build-worker runtime-agent e confirme a stack completa.",
+      "waitingForLogs": "Aguardando saída do build…",
+      "loadingLogs": "Carregando logs…",
+      "liveLogs": "Ao vivo",
+      "refreshLogs": "Atualizar",
       "webhookReceived": "Webhook recebido",
       "sourceCloned": "Fonte clonada",
       "stackDetected": "Stack detectada",
       "imageBuilt": "Imagem construída",
       "imagePushed": "Imagem enviada",
       "replicasRolled": "Réplicas atualizadas",
-      "healthchecks": "Healthchecks"
+      "healthchecks": "Healthchecks",
+      "publicUrl": "URL pública",
+      "listenPort": "Porta do container: {port}",
+      "url404Hint": "Se der 404, execute: docker compose restart traefik — e confira se existe deployments/traefik/dynamic/nebula-*.yml com o host acima."
     }
   },
   "domains": {

@@ -960,6 +960,180 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /api/v1/services/{serviceID}/logs/stream:
+    get:
+      tags: [Logs]
+      operationId: serviceLogsStream
+      summary: WebSocket stream of build/runtime log lines (Redis pub/sub)
+      description: |
+        Upgrades to WebSocket. Pass `deployment_id` and optional `token` query param
+        when the browser cannot send `Authorization`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: deployment_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: token
+          in: query
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/services/{serviceID}/domains:
+    get:
+      tags: [Domains]
+      operationId: listDomains
+      summary: List custom domains for a service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Domain rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Domain" }
+    post:
+      tags: [Domains]
+      operationId: createDomain
+      summary: Register a custom hostname (pending verification)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hostname]
+              properties:
+                hostname: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Domain" }
+
+  /api/v1/services/{serviceID}/domains/{domainID}:
+    delete:
+      tags: [Domains]
+      operationId: deleteDomain
+      summary: Remove a custom domain
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: domainID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted.
+
+  /api/v1/services/{serviceID}/domains/{domainID}/verify:
+    post:
+      tags: [Domains]
+      operationId: verifyDomain
+      summary: Mark domain verified (ACME on next deploy)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: domainID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Verified domain.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Domain" }
+
+  /api/v1/services/{serviceID}/terminal:
+    get:
+      tags: [Terminal]
+      operationId: serviceTerminal
+      summary: WebSocket interactive shell (developer+)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: token
+          in: query
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+        "403":
+          description: Terminal disabled or forbidden.
+
   /api/v1/services/{serviceID}/metrics:
     get:
       tags: [Metrics]
@@ -1022,6 +1196,49 @@ paths:
                 required: [data]
                 properties:
                   data: { $ref: "#/components/schemas/Deployment" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/deployments/{deploymentID}/build-logs:
+    get:
+      tags: [Deployments]
+      operationId: getDeploymentBuildLogs
+      summary: Build and deploy log history for a deployment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            maximum: 500
+      responses:
+        "200":
+          description: Log lines (oldest first).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/BuildLogLine" }
         "401":
           description: Unauthorized.
           content:
@@ -1182,6 +1399,7 @@ components:
         commit_message: { type: string }
         ref: { type: string }
         image_ref: { type: string }
+        error_message: { type: string }
         duration_ms: { type: integer, format: int64 }
         created_at: { type: string, format: date-time }
         started_at: { type: string, format: date-time }
@@ -1203,7 +1421,32 @@ components:
         level: { type: string }
         service: { type: string }
         message: { type: string }
+
+    BuildLogLine:
+      type: object
+      required: [message]
+      properties:
+        deployment_id: { type: string }
+        level: { type: string }
+        message: { type: string }
+        ts: { type: string }
+        source: { type: string }
         correlation_id: { type: string }
+
+    Domain:
+      type: object
+      required: [id, service_id, hostname, ssl_status, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        service_id: { type: string, format: uuid }
+        hostname: { type: string }
+        is_primary: { type: boolean }
+        ssl_status: { type: string, enum: [pending, issued, failed] }
+        verification_token: { type: string }
+        verified_at: { type: string, format: date-time }
+        cname_hint: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     MetricPoint:
       type: object

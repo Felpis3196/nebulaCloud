@@ -5,6 +5,7 @@ import { Cloud, Github } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { ThemeSwitcher } from "@/components/layout/theme-switcher";
 import { env } from "@/lib/env";
 
 export function LandingNav() {
@@ -33,12 +34,13 @@ export function LandingNav() {
             rel="noreferrer"
             className="transition-colors hover:text-foreground"
           >
-            {t("github")}
+            {t("sourceCode")}
           </a>
         </nav>
 
         <div className="flex items-center gap-2">
           <LocaleSwitcher />
+          <ThemeSwitcher />
           <Button asChild variant="ghost" size="sm">
             <a href={env.NEXT_PUBLIC_GITHUB_URL} target="_blank" rel="noreferrer">
               <Github className="h-4 w-4" />

@@ -143,6 +143,9 @@ export interface Deployment {
   commit_message?: string;
   ref?: string;
   image_ref?: string;
+  error_message?: string;
+  route_host?: string;
+  listen_port?: number;
   duration_ms?: number;
   triggered_by?: { id: string; email: string };
   created_at: string;
@@ -162,6 +165,15 @@ export interface LogLine {
   service: string;
   message: string;
   correlation_id?: string;
+}
+
+/** Build/deploy log line from Redis history or WebSocket stream. */
+export interface BuildLogLine {
+  deployment_id?: string;
+  level?: string;
+  message: string;
+  ts?: string;
+  source?: string;
 }
 
 export interface MetricSeries {

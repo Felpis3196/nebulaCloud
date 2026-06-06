@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { ThemeSwitcher } from "@/components/layout/theme-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
+import { githubBlob } from "@/lib/github-urls";
 
 export function Topbar() {
   const t = useTranslations("nav");
@@ -23,7 +24,7 @@ export function Topbar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" aria-label={t("documentation")} asChild>
-              <a href="https://github.com/nebulacloud/nebula" target="_blank" rel="noreferrer">
+              <a href={githubBlob("docs/ARCHITECTURE.md")} target="_blank" rel="noreferrer">
                 <ExternalLink />
               </a>
             </Button>

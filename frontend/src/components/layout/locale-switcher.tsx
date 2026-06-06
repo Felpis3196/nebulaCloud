@@ -13,7 +13,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function LocaleSwitcher() {
   const t = useTranslations("locale");
@@ -28,16 +27,11 @@ export function LocaleSwitcher() {
 
   return (
     <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={t("label")}>
-              <Languages className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{t("label")}</TooltipContent>
-      </Tooltip>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={t("label")} title={t("label")}>
+          <Languages className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {locales.map((code) => (
           <DropdownMenuItem

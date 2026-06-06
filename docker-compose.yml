@@ -1,7 +1,8 @@
 # ============================================================================
 # NebulaCloud — base compose
 # Brings up the full platform: ingress, control plane, datastores, observability.
-# Use `docker-compose.dev.yml` as an overlay for local development.
+# Local dev: `docker-compose.override.yml` is merged automatically (frontend, api-dev).
+# Prod/minimal: `docker compose -f docker-compose.yml up -d` (skips override)
 # ============================================================================
 
 name: nebula
@@ -45,6 +46,7 @@ services:
     logging: *default-logging
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      DOCKER_API_VERSION: "1.44"
     command:
       - --configFile=/etc/traefik/traefik.yml
     ports:
@@ -53,7 +55,7 @@ services:
       - "8080:8080" # dashboard (dev only — restrict in prod)
     volumes:
       - ./deployments/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./deployments/traefik/dynamic.yml:/etc/traefik/dynamic/dynamic.yml:ro
+      - ./deployments/traefik/dynamic:/etc/traefik/dynamic:ro
       - traefik_certs:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -144,6 +146,32 @@ services:
   # ==========================================================================
   # Observability stack
   # ==========================================================================
+  cadvisor:
+    # v0.53+ required for Docker Desktop API ≥1.44. Layerdb errors on self-container are benign on WSL2.
+    image: ghcr.io/google/cadvisor:v0.53.0
+    <<: *default-restart
+    logging: *default-logging
+    privileged: true
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    command:
+      - --docker_only
+      - --housekeeping_interval=30s
+      - --store_container_labels=true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      # cAdvisor reads overlay metadata under /rootfs/var/lib/docker (not /var/lib/docker).
+      - /var/lib/docker:/rootfs/var/lib/docker:ro
+    networks:
+      - nebula_platform
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   prometheus:
     image: prom/prometheus:v2.55.0
     <<: *default-restart
@@ -250,6 +278,8 @@ services:
       NEBULA_SERVICE_NAME: nebula-api
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      NEBULA_REGISTRY_URL: localhost:5000
+      NEBULA_REGISTRY_INSECURE: "true"
       NEBULA_LOKI_URL: http://loki:3100
       NEBULA_PROMETHEUS_URL: http://prometheus:9090
     networks:
@@ -288,7 +318,7 @@ services:
       NEBULA_SERVICE_NAME: nebula-build-worker
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
-      NEBULA_REGISTRY_URL: registry:5000
+      NEBULA_REGISTRY_URL: localhost:5000
       NEBULA_REGISTRY_INSECURE: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -301,6 +331,12 @@ services:
         condition: service_healthy
       registry:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "/app/build-worker", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   runtime-agent:
     build:
@@ -317,10 +353,13 @@ services:
       NEBULA_SERVICE_NAME: nebula-runtime-agent
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
-      NEBULA_REGISTRY_URL: registry:5000
+      NEBULA_REGISTRY_URL: localhost:5000
       NEBULA_REGISTRY_INSECURE: "true"
+      NEBULA_TRAEFIK_USER_ROUTES_DIR: /etc/traefik/dynamic
+      NEBULA_TRAEFIK_API_URL: http://traefik:8080
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./deployments/traefik/dynamic:/etc/traefik/dynamic
     networks:
       - nebula_platform
     depends_on:
@@ -330,3 +369,9 @@ services:
         condition: service_healthy
       registry:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "/app/runtime-agent", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

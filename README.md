@@ -116,6 +116,17 @@ curl http://api.nebula.localhost/healthz
 # Dashboard: http://app.nebula.localhost
 ```
 
+### Connect a GitHub repo and deploy
+
+See **[docs/DEV-ACCESS.md](docs/DEV-ACCESS.md)** for URLs on Windows/Docker Desktop.
+
+1. Sign in at the dashboard → **Projects** in the sidebar.
+2. Create an organization and a project (**New project** or demo).
+3. Open the project → **Connect repository** in the header (GitHub icon).
+4. Add a **web service** on the overview tab, then **Deploy now**.
+
+Automatic deploys on `git push` require a GitHub webhook pointing at `/api/v1/webhooks/github` (shown in the connect dialog).
+
 ### Running the frontend on its own
 
 The dashboard is a stock Next.js 15 app, so you can also run it natively:
@@ -174,7 +185,7 @@ nebula-cloud/
 ├── deployments/          # Infra config (traefik, prom, grafana, loki, ...)
 ├── docs/                 # Architecture, deploy flow, security notes
 ├── docker-compose.yml    # Base stack
-├── docker-compose.dev.yml# Dev overrides (hot reload, exposed ports)
+├── docker-compose.override.yml  # Dev overrides (auto-merged: frontend, api-dev)
 └── Makefile
 ```
 

@@ -17,12 +17,9 @@ export function HowItWorks() {
             {t("label")}
           </p>
           <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            {t.rich("title", {
-              mono: () => (
-                <span className="font-mono text-foreground">{t("mono")}</span>
-              ),
-              live: () => <span className="text-gradient">{t("live")}</span>,
-            })}
+            {t("titlePrefix")}{" "}
+            <span className="font-mono text-foreground">{t("titleMono")}</span> {t("titleMid")}{" "}
+            <span className="text-gradient">{t("titleLive")}</span> {t("titleSuffix")}
           </h2>
         </div>
 

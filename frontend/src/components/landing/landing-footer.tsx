@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Cloud, Github } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { env } from "@/lib/env";
+import { githubBlob } from "@/lib/github-urls";
 
 export function LandingFooter() {
   const t = useTranslations("landing");
@@ -29,19 +30,25 @@ export function LandingFooter() {
           <FooterColumn title={t("resources")}>
             <FooterLink href={env.NEXT_PUBLIC_GITHUB_URL} external>
               <Github className="h-3 w-3" />
-              {t("github")}
+              {t("sourceCode")}
             </FooterLink>
-            <FooterLink href={`${env.NEXT_PUBLIC_GITHUB_URL}/blob/main/docs/ARCHITECTURE.md`} external>
+            <FooterLink href={githubBlob("README.md")} external>
+              {t("readme")}
+            </FooterLink>
+            <FooterLink href={githubBlob("docs/ARCHITECTURE.md")} external>
               {t("architecture")}
             </FooterLink>
-            <FooterLink href={`${env.NEXT_PUBLIC_GITHUB_URL}/blob/main/docs/SECURITY.md`} external>
+            <FooterLink href={githubBlob("docs/SECURITY.md")} external>
               {t("security")}
+            </FooterLink>
+            <FooterLink href={githubBlob("docs/CONTRIBUTING.md")} external>
+              {t("contributing")}
             </FooterLink>
           </FooterColumn>
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border/40 pt-6 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
             {t("copyright", { year: new Date().getFullYear() })}
           </p>
           <p className="font-mono text-xs text-muted-foreground">{t("version")}</p>

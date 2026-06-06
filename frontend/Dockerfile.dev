@@ -1,7 +1,7 @@
 # =============================================================================
 # Frontend — development image
 #
-# Used by docker-compose.dev.yml. Boots `next dev` with hot reload, sources
+# Used by docker-compose.override.yml. Boots `next dev` with hot reload, sources
 # bind-mounted from the host, deps installed inside the container.
 #
 # Production image (multi-stage with `next build && next start`) lands in a

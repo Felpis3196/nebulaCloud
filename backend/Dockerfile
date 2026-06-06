@@ -7,10 +7,10 @@
 #   - api          : minimal runtime image for the API
 #   - build-worker : minimal runtime image for the build worker
 #   - runtime-agent: minimal runtime image for the runtime agent
-#   - api-dev      : hot-reload dev image (used by docker-compose.dev.yml)
+#   - api-dev      : hot-reload dev image (used by docker-compose.override.yml)
 # ============================================================================
 
-ARG GO_VERSION=1.23
+ARG GO_VERSION=1.25
 # Official Docker CLI image (Alpine). Tags like docker:24-cli-alpine do not exist on Hub.
 ARG DOCKER_CLI_IMAGE=docker:27-cli
 
@@ -76,7 +76,7 @@ COPY --from=builder /out/runtime-agent /app/runtime-agent
 ENTRYPOINT ["/app/runtime-agent"]
 
 # ---------------------------------------------------------------------------
-# Dev image with hot reload (used only by docker-compose.dev.yml)
+# Dev image with hot reload (used only by docker-compose.override.yml)
 # ---------------------------------------------------------------------------
 FROM golang:${GO_VERSION}-alpine AS api-dev
 WORKDIR /workspace

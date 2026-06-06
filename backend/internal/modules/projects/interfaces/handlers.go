@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -15,19 +16,41 @@ import (
 	"github.com/nebulacloud/nebula/internal/platform/auth"
 	platformerrors "github.com/nebulacloud/nebula/internal/platform/errors"
 	"github.com/nebulacloud/nebula/internal/platform/httpx"
+	"github.com/nebulacloud/nebula/internal/platform/logstream"
+	"github.com/nebulacloud/nebula/internal/platform/routing"
 	"github.com/nebulacloud/nebula/internal/platform/secrets"
 )
 
 // Handler exposes Phase 2+ workspace HTTP endpoints.
 type Handler struct {
-	svc    *projectsapp.Service
-	sealer secrets.Sealer
-	rtBase string // NEBULA_BASE_DOMAIN
+	svc         *projectsapp.Service
+	sealer      secrets.Sealer
+	rtBase      string // NEBULA_BASE_DOMAIN
+	logSub      *logstream.Subscriber
+	verifyToken func(ctx context.Context, token string) (auth.Principal, error)
+	terminalOn  bool
+	auditFn     func(ctx context.Context, actor auth.Principal, serviceID uuid.UUID, action string)
+}
+
+// HandlerOpts configures WebSocket and terminal features.
+type HandlerOpts struct {
+	LogSubscriber *logstream.Subscriber
+	VerifyToken   func(ctx context.Context, token string) (auth.Principal, error)
+	TerminalOn    bool
+	AuditFn       func(ctx context.Context, actor auth.Principal, serviceID uuid.UUID, action string)
 }
 
 // NewHandler builds a Handler wired for JSON + secrets decryption previews.
-func NewHandler(svc *projectsapp.Service, sealer secrets.Sealer, runtimeBaseDomain string) *Handler {
-	return &Handler{svc: svc, sealer: sealer, rtBase: strings.TrimSpace(runtimeBaseDomain)}
+func NewHandler(svc *projectsapp.Service, sealer secrets.Sealer, runtimeBaseDomain string, opts HandlerOpts) *Handler {
+	return &Handler{
+		svc:         svc,
+		sealer:      sealer,
+		rtBase:      strings.TrimSpace(runtimeBaseDomain),
+		logSub:      opts.LogSubscriber,
+		verifyToken: opts.VerifyToken,
+		terminalOn:  opts.TerminalOn,
+		auditFn:     opts.AuditFn,
+	}
 }
 
 // Mount installs authenticated workspace routes under r (mount at `/` inside authed `/api/v1`).
@@ -40,31 +63,37 @@ func (h *Handler) Mount(r chi.Router) {
 		rr.Post("/projects", h.createProject)
 	})
 
-	r.Get("/projects/{projectID}", h.getProject)
-	r.Patch("/projects/{projectID}", h.patchProject)
-
 	r.Route("/projects/{projectID}", func(rr chi.Router) {
+		rr.Get("/", h.getProject)
+		rr.Patch("/", h.patchProject)
 		rr.Get("/services", h.listServices)
 		rr.Post("/services", h.createService)
 		rr.Get("/deployments", h.listDeploymentsByProject)
+		rr.Post("/github-installation", h.linkGithubInstallation)
 	})
 
-	r.Get("/services/{serviceID}", h.getService)
-	r.Patch("/services/{serviceID}", h.patchService)
-
 	r.Route("/services/{serviceID}", func(rr chi.Router) {
+		rr.Get("/", h.getService)
+		rr.Patch("/", h.patchService)
 		rr.Get("/env-vars", h.listEnv)
 		rr.Post("/env-vars", h.postEnvVar)
 		rr.Delete("/env-vars/{envKey}", h.deleteEnvVar)
 		rr.Get("/deployments", h.listDeployments)
 		rr.Post("/deployments", h.createDeployment)
 		rr.Get("/logs", h.serviceLogs)
+		rr.Get("/logs/stream", h.streamLogs)
 		rr.Get("/metrics", h.serviceMetrics)
+		rr.Get("/domains", h.listDomains)
+		rr.Post("/domains", h.createDomain)
+		rr.Delete("/domains/{domainID}", h.deleteDomain)
+		rr.Post("/domains/{domainID}/verify", h.verifyDomain)
+		rr.Get("/terminal", h.serviceTerminal)
 	})
 
-	r.Get("/deployments/{deploymentID}", h.getDeployment)
-
-	r.Post("/projects/{projectID}/github-installation", h.linkGithubInstallation)
+	r.Route("/deployments/{deploymentID}", func(rr chi.Router) {
+		rr.Get("/", h.getDeployment)
+		rr.Get("/build-logs", h.deploymentBuildLogs)
+	})
 }
 
 func principal(r *http.Request) (auth.Principal, bool) {
@@ -353,12 +382,7 @@ func toServiceDTO(s projectsinfra.ServiceRow, baseDomain string, projSlug string
 }
 
 func fmtServiceURL(baseDomain, svcSlug, projSlug string) string {
-	host := sanitizeHost(svcSlug) + "." + sanitizeHost(projSlug) + "." + strings.Trim(strings.TrimPrefix(baseDomain, "."), "")
-	return "http://" + host
-}
-
-func sanitizeHost(s string) string {
-	return strings.Trim(strings.ToLower(s), "")
+	return routing.ServiceURL(svcSlug, projSlug, baseDomain)
 }
 
 func (h *Handler) listServices(w http.ResponseWriter, r *http.Request) {
@@ -607,6 +631,9 @@ type deploymentDTO struct {
 	CommitMessage *string              `json:"commit_message,omitempty"`
 	Ref           *string              `json:"ref,omitempty"`
 	ImageRef      *string              `json:"image_ref,omitempty"`
+	ErrorMessage  *string              `json:"error_message,omitempty"`
+	RouteHost     *string              `json:"route_host,omitempty"`
+	ListenPort    *int                 `json:"listen_port,omitempty"`
 	DurationMs    int64                `json:"duration_ms,omitempty"`
 	CreatedAt     string               `json:"created_at"`
 	StartedAt     *string              `json:"started_at,omitempty"`
@@ -644,12 +671,12 @@ func (h *Handler) listDeploymentsByProject(w http.ResponseWriter, r *http.Reques
 	}
 	out := make([]deploymentDTO, 0, len(items))
 	for _, it := range items {
-		out = append(out, toDeployDTO(it))
+		out = append(out, h.toDeployDTO(it))
 	}
 	httpx.OK(w, out)
 }
 
-func toDeployDTO(j projectsinfra.DeploymentJoined) deploymentDTO {
+func (h *Handler) toDeployDTO(j projectsinfra.DeploymentJoined) deploymentDTO {
 	d := deploymentDTO{
 		ID:           j.ID.String(),
 		ServiceID:    j.ServiceID.String(),
@@ -668,10 +695,19 @@ func toDeployDTO(j projectsinfra.DeploymentJoined) deploymentDTO {
 		d.CommitMessage = &m
 	}
 	d.Ref = j.Ref
+	d.ErrorMessage = j.ErrorMessage
 	d.StartedAt = timePtrRFC(j.StartedAt)
 	d.FinishedAt = timePtrRFC(j.FinishedAt)
 	if j.TriggeredBy != nil && j.TriggerEmail != nil {
 		d.TriggeredBy = &deploymentActorDTO{ID: j.TriggeredBy.String(), Email: *j.TriggerEmail}
+	}
+	if j.Status == "running" || j.Status == "deploying" {
+		host := routing.FormatServiceHost(j.ServiceSlug, j.ProjectSlug, h.rtBase)
+		d.RouteHost = &host
+		if j.ListenPort > 0 {
+			p := j.ListenPort
+			d.ListenPort = &p
+		}
 	}
 	return d
 }
@@ -696,7 +732,7 @@ func (h *Handler) listDeployments(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]deploymentDTO, 0, len(items))
 	for _, it := range items {
-		out = append(out, toDeployDTO(it))
+		out = append(out, h.toDeployDTO(it))
 	}
 	httpx.OK(w, out)
 }
@@ -716,7 +752,7 @@ func (h *Handler) createDeployment(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, err)
 		return
 	}
-	httpx.Created(w, map[string]string{"id": depID.String(), "status": "queued"})
+	httpx.Created(w, map[string]string{"id": depID.String(), "status": "building"})
 }
 
 func (h *Handler) getDeployment(w http.ResponseWriter, r *http.Request) {
@@ -734,7 +770,55 @@ func (h *Handler) getDeployment(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, err)
 		return
 	}
-	httpx.OK(w, toDeployDTO(dj))
+	httpx.OK(w, h.toDeployDTO(dj))
+}
+
+type buildLogLineDTO struct {
+	DeploymentID string `json:"deployment_id,omitempty"`
+	Level        string `json:"level,omitempty"`
+	Message      string `json:"message"`
+	TS           string `json:"ts,omitempty"`
+	Source       string `json:"source,omitempty"`
+}
+
+func (h *Handler) deploymentBuildLogs(w http.ResponseWriter, r *http.Request) {
+	pr, ok := principal(r)
+	if !ok {
+		httpx.Error(w, platformerrors.Unauthorized("not authenticated"))
+		return
+	}
+	id, ok2 := parseUUID(chi.URLParam(r, "deploymentID"), w)
+	if !ok2 {
+		return
+	}
+	if _, err := h.svc.GetDeployment(r.Context(), pr, id); err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	if h.logSub == nil {
+		httpx.OK(w, []buildLogLineDTO{})
+		return
+	}
+	limit := qInt(r, "limit", 200)
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	lines, err := h.logSub.History(r.Context(), id.String(), limit)
+	if err != nil {
+		httpx.Error(w, platformerrors.Internal("build logs").WithCause(err))
+		return
+	}
+	out := make([]buildLogLineDTO, 0, len(lines))
+	for _, ln := range lines {
+		out = append(out, buildLogLineDTO{
+			DeploymentID: ln.DeploymentID,
+			Level:        ln.Level,
+			Message:      ln.Message,
+			TS:           ln.TS,
+			Source:       ln.Source,
+		})
+	}
+	httpx.OK(w, out)
 }
 
 func (h *Handler) serviceLogs(w http.ResponseWriter, r *http.Request) {

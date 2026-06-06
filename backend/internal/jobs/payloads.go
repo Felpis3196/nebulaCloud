@@ -34,5 +34,6 @@ type DeployRunPayload struct {
 	ServiceSlug    string `json:"service_slug"`
 	ImageRef       string `json:"image_ref"`
 	ListenPort     int    `json:"listen_port"`
+	DetectedStack  string `json:"detected_stack,omitempty"`
 	BaseDomain     string `json:"base_domain"`
 }

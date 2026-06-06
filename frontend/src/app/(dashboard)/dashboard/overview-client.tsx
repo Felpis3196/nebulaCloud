@@ -1,7 +1,9 @@
 "use client";
 
-import { Activity, Cpu, Rocket, Timer } from "lucide-react";
+import Link from "next/link";
+import { Activity, ArrowRight, Cpu, FolderGit2, Rocket, Timer } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DeployTimeline } from "@/components/dashboard/deploy-timeline";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
@@ -48,6 +50,24 @@ export function OverviewDashboardClient() {
 
       <div className="rounded-md border border-border/80 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{t("mvpBanner")}</span> {t("mvpText")}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+            <FolderGit2 className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">{t("deployCtaTitle")}</p>
+            <p className="text-xs text-muted-foreground">{t("deployCtaDesc")}</p>
+          </div>
+        </div>
+        <Button asChild variant="gradient" size="sm" className="shrink-0">
+          <Link href="/projects">
+            {t("deployCtaButton")}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

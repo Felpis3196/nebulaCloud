@@ -407,7 +407,7 @@ func (r *Repository) CreateService(ctx context.Context, projectID uuid.UUID, slu
 	}
 	id := uuid.New()
 	buildJSON := json.RawMessage(`{}`)
-	runtimeJSON := json.RawMessage(`{"listen_port":8080,"replicas":1}`)
+	runtimeJSON := json.RawMessage(`{"listen_port":8080,"listen_port_auto":true,"replicas":1}`)
 	const q = `
 		INSERT INTO services (id, project_id, slug, name, type, status, build_config, runtime_config, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, 'idle', $6, $7, NOW(), NOW())
@@ -487,6 +487,31 @@ func mergeJSON(base json.RawMessage, patch json.RawMessage) (json.RawMessage, er
 		return nil, err
 	}
 	return b, nil
+}
+
+// PatchServiceRuntimeConfig merges listen_port and detected_stack into runtime_config after build.
+func (r *Repository) PatchServiceRuntimeConfig(ctx context.Context, serviceID uuid.UUID, listenPort int, detectedStack string) error {
+	s, err := r.GetService(ctx, serviceID)
+	if err != nil {
+		return err
+	}
+	patch, err := json.Marshal(map[string]any{
+		"listen_port":      listenPort,
+		"listen_port_auto": true,
+		"detected_stack":   detectedStack,
+	})
+	if err != nil {
+		return platformerrors.Internal("marshal runtime_config").WithCause(err)
+	}
+	merged, err := mergeJSON(s.RuntimeConfig, patch)
+	if err != nil {
+		return platformerrors.Validation("invalid runtime_config").WithCause(err)
+	}
+	const q = `UPDATE services SET runtime_config = $2, updated_at = NOW() WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, q, serviceID, merged); err != nil {
+		return platformerrors.Internal("patch service runtime_config").WithCause(err)
+	}
+	return nil
 }
 
 // PatchServiceRuntimeImage sets current_image and optionally status for deploy completion.
@@ -712,10 +737,12 @@ func (r *Repository) ListDeploymentsJoined(ctx context.Context, serviceID *uuid.
 	limitParam := n
 
 	q := fmt.Sprintf(`
-		SELECT d.id, d.service_id, s.name AS service_name, p.id AS project_id, p.name AS project_name,
+		SELECT d.id, d.service_id, s.name AS service_name, s.slug AS service_slug,
+		       p.id AS project_id, p.name AS project_name, p.slug AS project_slug,
 		       d.triggered_by, u.email AS trigger_email, d.trigger, d.status,
-		       d.commit_sha, d.commit_message, d.ref, d.image_ref,
+		       d.commit_sha, d.commit_message, d.ref, d.image_ref, d.error_message,
 		       COALESCE((EXTRACT(EPOCH FROM (d.finished_at - d.started_at)) * 1000)::bigint, 0) AS duration_ms,
+		       COALESCE((s.runtime_config->>'listen_port')::int, 0) AS listen_port,
 		       d.created_at, d.started_at, d.finished_at
 		FROM deployments d
 		INNER JOIN services s ON s.id = d.service_id
@@ -736,9 +763,9 @@ func (r *Repository) ListDeploymentsJoined(ctx context.Context, serviceID *uuid.
 		var trig *uuid.UUID
 		var trigEmail *string
 		if err := rows.Scan(
-			&dj.ID, &dj.ServiceID, &dj.ServiceName, &dj.ProjectID, &dj.ProjectName,
+			&dj.ID, &dj.ServiceID, &dj.ServiceName, &dj.ServiceSlug, &dj.ProjectID, &dj.ProjectName, &dj.ProjectSlug,
 			&trig, &trigEmail, &dj.Trigger, &dj.Status,
-			&dj.CommitSHA, &dj.CommitMsg, &dj.Ref, &dj.ImageRef, &dj.DurationMs,
+			&dj.CommitSHA, &dj.CommitMsg, &dj.Ref, &dj.ImageRef, &dj.ErrorMessage, &dj.DurationMs, &dj.ListenPort,
 			&dj.CreatedAt, &dj.StartedAt, &dj.FinishedAt,
 		); err != nil {
 			return nil, platformerrors.Internal("scan deployment").WithCause(err)
@@ -753,10 +780,12 @@ func (r *Repository) ListDeploymentsJoined(ctx context.Context, serviceID *uuid.
 // GetDeploymentJoined fetches one deployment plus join metadata.
 func (r *Repository) GetDeploymentJoined(ctx context.Context, id uuid.UUID) (DeploymentJoined, error) {
 	const q = `
-		SELECT d.id, d.service_id, s.name AS service_name, p.id AS project_id, p.name AS project_name,
+		SELECT d.id, d.service_id, s.name AS service_name, s.slug AS service_slug,
+		       p.id AS project_id, p.name AS project_name, p.slug AS project_slug,
 		       d.triggered_by, u.email AS trigger_email, d.trigger, d.status,
-		       d.commit_sha, d.commit_message, d.ref, d.image_ref,
+		       d.commit_sha, d.commit_message, d.ref, d.image_ref, d.error_message,
 		       COALESCE((EXTRACT(EPOCH FROM (d.finished_at - d.started_at)) * 1000)::bigint, 0) AS duration_ms,
+		       COALESCE((s.runtime_config->>'listen_port')::int, 0) AS listen_port,
 		       d.created_at, d.started_at, d.finished_at
 		FROM deployments d
 		INNER JOIN services s ON s.id = d.service_id
@@ -767,9 +796,9 @@ func (r *Repository) GetDeploymentJoined(ctx context.Context, id uuid.UUID) (Dep
 	var trig *uuid.UUID
 	var trigEmail *string
 	if err := r.pool.QueryRow(ctx, q, id).Scan(
-		&dj.ID, &dj.ServiceID, &dj.ServiceName, &dj.ProjectID, &dj.ProjectName,
+		&dj.ID, &dj.ServiceID, &dj.ServiceName, &dj.ServiceSlug, &dj.ProjectID, &dj.ProjectName, &dj.ProjectSlug,
 		&trig, &trigEmail, &dj.Trigger, &dj.Status,
-		&dj.CommitSHA, &dj.CommitMsg, &dj.Ref, &dj.ImageRef, &dj.DurationMs,
+		&dj.CommitSHA, &dj.CommitMsg, &dj.Ref, &dj.ImageRef, &dj.ErrorMessage, &dj.DurationMs, &dj.ListenPort,
 		&dj.CreatedAt, &dj.StartedAt, &dj.FinishedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -787,8 +816,11 @@ type DeploymentJoined struct {
 	ID            uuid.UUID
 	ServiceID     uuid.UUID
 	ServiceName   string
+	ServiceSlug   string
 	ProjectID     uuid.UUID
 	ProjectName   string
+	ProjectSlug   string
+	ListenPort    int
 	TriggeredBy   *uuid.UUID
 	TriggerEmail  *string
 	Trigger       string
@@ -797,6 +829,7 @@ type DeploymentJoined struct {
 	CommitMsg     *string
 	Ref           *string
 	ImageRef      *string
+	ErrorMessage  *string
 	DurationMs    int64
 	CreatedAt     time.Time
 	StartedAt     *time.Time

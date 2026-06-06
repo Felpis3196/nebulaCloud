@@ -11,7 +11,14 @@ import (
 	"github.com/nebulacloud/nebula/internal/jobs"
 )
 
-const defaultQueue = "critical"
+// Named queues isolate job types so build-worker and runtime-agent do not
+// compete for the same tasks (both previously listened on "critical").
+const (
+	QueueBuild  = "build"
+	QueueDeploy = "deploy"
+)
+
+const defaultQueue = QueueBuild
 
 // AsynqProducer implements Producer using github.com/hibiken/asynq.
 type AsynqProducer struct {
@@ -72,19 +79,35 @@ type AsynqWorker struct {
 	mux    *asynq.ServeMux
 }
 
-// NewAsynqWorker constructs a Worker that listens on the default queues.
-func NewAsynqWorker(redisAddr, redisPassword string, redisDB int) *AsynqWorker {
+// NewAsynqWorker constructs a Worker that listens only on the given queues.
+// Pass BuildWorkerQueues() or DeployWorkerQueues() from each cmd binary.
+// errorHandler is optional (runtime-agent uses it to mark deployments failed).
+func NewAsynqWorker(redisAddr, redisPassword string, redisDB int, queues map[string]int, errorHandler asynq.ErrorHandler) *AsynqWorker {
+	if len(queues) == 0 {
+		queues = BuildWorkerQueues()
+	}
+	cfg := asynq.Config{
+		Concurrency: 4,
+		Queues:      queues,
+	}
+	if errorHandler != nil {
+		cfg.ErrorHandler = errorHandler
+	}
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword, DB: redisDB},
-		asynq.Config{
-			Concurrency: 4,
-			Queues: map[string]int{
-				"critical": 6,
-				"default":  3,
-			},
-		},
+		cfg,
 	)
 	return &AsynqWorker{server: srv, mux: asynq.NewServeMux()}
+}
+
+// BuildWorkerQueues returns queue weights for build-worker only.
+func BuildWorkerQueues() map[string]int {
+	return map[string]int{QueueBuild: 10}
+}
+
+// DeployWorkerQueues returns queue weights for runtime-agent only.
+func DeployWorkerQueues() map[string]int {
+	return map[string]int{QueueDeploy: 10}
 }
 
 // Register implements Worker.

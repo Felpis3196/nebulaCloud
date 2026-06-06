@@ -18,13 +18,15 @@ const schema = z.object({
   NEXT_PUBLIC_GITHUB_URL: z
     .string()
     .url()
-    .default("https://github.com/nebulacloud/nebula"),
+    .default("https://github.com/Felpis3196/nebulaCloud"),
+  NEXT_PUBLIC_GITHUB_BRANCH: z.string().min(1).default("master"),
 });
 
 const raw = {
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_GITHUB_URL: process.env.NEXT_PUBLIC_GITHUB_URL,
+  NEXT_PUBLIC_GITHUB_BRANCH: process.env.NEXT_PUBLIC_GITHUB_BRANCH,
 };
 
 export const env = schema.parse(raw);

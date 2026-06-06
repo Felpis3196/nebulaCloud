@@ -67,6 +67,7 @@ coverage/
 .nyc_output/
 
 # Local Traefik / Grafana / Loki state
+deployments/traefik/dynamic/nebula-*.yml
 deployments/traefik/acme.json
 deployments/grafana/data/
 deployments/loki/data/

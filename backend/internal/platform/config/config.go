@@ -52,7 +52,20 @@ type Config struct {
 	Tracing       TracingConfig
 	RateLimit     RateLimitConfig
 	CORS          CORSConfig
+	App           AppConfig
 	Observability ObservabilityConfig
+	AutoMigrate   bool `env:"NEBULA_AUTO_MIGRATE" envDefault:"false"`
+	Terminal      TerminalConfig
+}
+
+// AppConfig holds dashboard URLs used for OAuth redirects.
+type AppConfig struct {
+	URL string `env:"NEBULA_APP_URL" envDefault:"http://localhost:3000"`
+}
+
+// TerminalConfig gates the web terminal (requires Docker socket on API).
+type TerminalConfig struct {
+	Enabled bool `env:"NEBULA_TERMINAL_ENABLED" envDefault:"false"`
 }
 
 // ObservabilityConfig points the API at Loki/Prometheus for dashboard reads.
@@ -140,6 +153,7 @@ type GitHubConfig struct {
 	ClientSecret      string `env:"NEBULA_GITHUB_APP_CLIENT_SECRET"`
 	WebhookSecret     string `env:"NEBULA_GITHUB_APP_WEBHOOK_SECRET"`
 	PrivateKeyPath    string `env:"NEBULA_GITHUB_APP_PRIVATE_KEY_PATH"`
+	OAuthRedirectURL  string `env:"NEBULA_GITHUB_OAUTH_REDIRECT_URL"`
 }
 
 // BuildConfig configures the build worker.
@@ -151,9 +165,11 @@ type BuildConfig struct {
 
 // RuntimeConfig configures the runtime agent.
 type RuntimeConfig struct {
-	DockerHost string `env:"NEBULA_DOCKER_HOST"     envDefault:"unix:///var/run/docker.sock"`
-	Network    string `env:"NEBULA_RUNTIME_NETWORK" envDefault:"nebula_apps"`
-	BaseDomain string `env:"NEBULA_BASE_DOMAIN"     envDefault:"nebula.localhost"`
+	DockerHost           string `env:"NEBULA_DOCKER_HOST"              envDefault:"unix:///var/run/docker.sock"`
+	Network              string `env:"NEBULA_RUNTIME_NETWORK"          envDefault:"nebula_platform"`
+	BaseDomain           string `env:"NEBULA_BASE_DOMAIN"              envDefault:"nebula.localhost"`
+	TraefikUserRoutesDir string `env:"NEBULA_TRAEFIK_USER_ROUTES_DIR"  envDefault:"/etc/traefik/dynamic"`
+	TraefikAPIURL        string `env:"NEBULA_TRAEFIK_API_URL"          envDefault:"http://traefik:8080"`
 }
 
 // MetricsConfig exposes Prometheus scrape options.

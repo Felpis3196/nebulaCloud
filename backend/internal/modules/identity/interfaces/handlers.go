@@ -14,11 +14,23 @@ import (
 
 // Handler exposes the Identity HTTP routes.
 type Handler struct {
-	svc *application.Service
+	svc            *application.Service
+	ghClientID     string
+	ghClientSecret string
+	ghRedirect     string
+	appURL         string
 }
 
 // NewHandler returns a Handler bound to the given service.
-func NewHandler(svc *application.Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *application.Service, ghClientID, ghClientSecret, ghRedirect, appURL string) *Handler {
+	return &Handler{
+		svc:            svc,
+		ghClientID:     ghClientID,
+		ghClientSecret: ghClientSecret,
+		ghRedirect:     ghRedirect,
+		appURL:         strings.TrimRight(strings.TrimSpace(appURL), "/"),
+	}
+}
 
 // Mount installs the auth routes under r at "/auth/...".
 func (h *Handler) Mount(r chi.Router) {
@@ -29,6 +41,7 @@ func (h *Handler) Mount(r chi.Router) {
 		r.Post("/logout", h.logout)
 		r.Get("/github", h.githubOAuthStart)
 		r.Get("/github/callback", h.githubOAuthCallback)
+		r.Get("/github/repos", h.githubOAuthRepos)
 	})
 }
 
@@ -64,7 +77,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	pair, err := h.svc.Login(r.Context(), application.LoginCommand{
 		Email:     req.Email,
 		Password:  req.Password,
-		IP:        clientIP(r),
+		IP:        httpx.ClientIP(r),
 		UserAgent: r.UserAgent(),
 	})
 	if err != nil {
@@ -82,7 +95,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	pair, err := h.svc.Refresh(r.Context(), application.RefreshCommand{
 		RefreshToken: req.RefreshToken,
-		IP:           clientIP(r),
+		IP:           httpx.ClientIP(r),
 		UserAgent:    r.UserAgent(),
 	})
 	if err != nil {
@@ -117,15 +130,3 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, toUserDTO(user))
 }
 
-func clientIP(r *http.Request) string {
-	if v := r.Header.Get("X-Forwarded-For"); v != "" {
-		if i := strings.IndexByte(v, ','); i > 0 {
-			return strings.TrimSpace(v[:i])
-		}
-		return strings.TrimSpace(v)
-	}
-	if v := r.Header.Get("X-Real-Ip"); v != "" {
-		return v
-	}
-	return r.RemoteAddr
-}

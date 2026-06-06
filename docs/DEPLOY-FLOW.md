@@ -57,19 +57,22 @@ sequenceDiagram
 
     RA->>Q: pull deploy.run
     RA->>RA: docker pull image_ref
-    RA->>RA: remove containers labeled nebula_service
     RA->>RA: docker run stable name + Traefik labels on nebula_platform
-    RA->>TR: Docker provider reads labels (no dynamic.yml in MVP)
+    RA->>RA: wait container HTTP on listen_port
+    RA->>TR: write nebula-*.yml + verify router (file provider)
+    RA->>RA: remove orphan containers for service
     RA->>DB: deployment(running), service.current_image=image_ref
 
-    Note over RA,TR: Failure path<br/>RA marks deployment(failed)<br/>previous container kept alive
+    Note over RA,TR: Failure path<br/>RA marks deployment(failed)<br/>removes route file if written
 ```
 
 ### MVP runtime (local compose)
 
-- Workloads join **`nebula_platform`** so Traefik’s Docker provider (same socket + network) can attach routers from container labels.
-- **One container per service**: the agent deletes any container with `label=nebula_service=<uuid>` before starting the new revision under a **stable** container name (`nebula-svc-<prefix>`), avoiding orphaned containers from earlier deploys.
-- **Not yet implemented** vs this document’s ideal path: file-based `dynamic.yml`, health-gated traffic switch, and automated rollback container swap (see Failure handling above for the target behaviour).
+- Workloads join **`nebula_platform`** (Traefik DNS to `nebula-svc-*` container names).
+- **Routing (dev):** `runtime-agent` writes **`deployments/traefik/dynamic/nebula-*.yml`** and verifies via Traefik API (`NEBULA_TRAEFIK_API_URL`). Docker provider is unreliable on Docker Desktop; file routes are primary.
+- **One container per service**: stable name `nebula-svc-<prefix>`; previous container with same name is removed before `docker run`; orphan labeled containers are pruned after success.
+- **Listen port:** `build-worker` detects `EXPOSE` / stack default, persists `runtime_config.listen_port`, passes it in `deploy.run`.
+- **Not yet implemented:** automated rollback container swap, full health-gated traffic switch with keep-old-on-failure.
 
 ## Rollback
 

@@ -42,7 +42,7 @@ providers:
     network: nebula_platform
     watch: true
   file:
-    filename: /etc/traefik/dynamic/dynamic.yml
+    directory: /etc/traefik/dynamic
     watch: true
 
 # ACME (Let's Encrypt) — configured but unused in local dev.

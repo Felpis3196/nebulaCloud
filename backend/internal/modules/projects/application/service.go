@@ -149,11 +149,22 @@ func noopGitSHA(sha string) bool {
 	return true
 }
 
+// normalizeRegistryHost keeps host:port valid for docker image references (do not mangle ':').
+func normalizeRegistryHost(reg string) string {
+	reg = strings.TrimSuffix(strings.TrimSpace(strings.ToLower(reg)), "/")
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ':' {
+			return r
+		}
+		return '-'
+	}, reg)
+}
+
 func composeImageRef(reg string, orgSlug, projSlug, svcSlug string, deploymentID uuid.UUID) string {
-	reg = strings.TrimSuffix(strings.TrimSpace(reg), "/")
+	reg = normalizeRegistryHost(reg)
 	tag := strings.ToLower(deploymentID.String()[:12])
 	return fmt.Sprintf("%s/%s/%s/%s:%s",
-		sanitizeImagePart(reg), sanitizeImagePart(orgSlug),
+		reg, sanitizeImagePart(orgSlug),
 		sanitizeImagePart(projSlug), sanitizeImagePart(svcSlug), tag)
 }
 
@@ -278,10 +289,27 @@ func (s *Service) GetService(ctx context.Context, actor auth.Principal, serviceI
 	return s.authorizeService(ctx, actor, serviceID, auth.RoleViewer)
 }
 
+// AuthorizeServiceDeveloper ensures developer+ access (terminal, domains).
+func (s *Service) AuthorizeServiceDeveloper(ctx context.Context, actor auth.Principal, serviceID uuid.UUID) error {
+	_, err := s.authorizeService(ctx, actor, serviceID, auth.RoleDeveloper)
+	return err
+}
+
 // UpdateService merges JSON patches into build/runtime configs.
 func (s *Service) UpdateService(ctx context.Context, actor auth.Principal, serviceID uuid.UUID, name *string, buildPatch, rtPatch json.RawMessage) (projectsinfra.ServiceRow, error) {
 	if _, err := s.authorizeService(ctx, actor, serviceID, auth.RoleDeveloper); err != nil {
 		return projectsinfra.ServiceRow{}, err
+	}
+	if len(rtPatch) > 0 && string(rtPatch) != "null" {
+		var pm map[string]any
+		if json.Unmarshal(rtPatch, &pm) == nil {
+			if _, ok := pm["listen_port"]; ok {
+				pm["listen_port_auto"] = false
+				if b, err := json.Marshal(pm); err == nil {
+					rtPatch = b
+				}
+			}
+		}
 	}
 	return s.repo.UpdateService(ctx, serviceID, name, buildPatch, rtPatch)
 }
@@ -413,7 +441,7 @@ func (s *Service) enqueueBuild(ctx context.Context, svc projectsinfra.ServiceRow
 		Payload:    queue.MustMarshalJSON(&payload),
 		MaxRetries: 2,
 		Timeout:    queue.DefaultBuildJobTimeout(),
-		Queue:      "critical",
+		Queue:      queue.QueueBuild,
 	}); err != nil {
 		return uuid.Nil, uuid.Nil, platformerrors.Internal("enqueue build").WithCause(err)
 	}
@@ -535,7 +563,7 @@ func (s *Service) QueryLogs(ctx context.Context, actor auth.Principal, serviceID
 	return telemetry.QueryLokiServiceLogs(ctx, s.lokiURL, serviceID.String(), window, limit)
 }
 
-// QueryMetrics returns scaffolded empty series plus best-effort Prom samples.
+// QueryMetrics returns per-service container CPU/memory from cAdvisor/Prometheus.
 func (s *Service) QueryMetrics(ctx context.Context, actor auth.Principal, serviceID uuid.UUID, window time.Duration) ([]telemetry.MetricSeries, error) {
 	if _, err := s.authorizeService(ctx, actor, serviceID, auth.RoleViewer); err != nil {
 		return nil, err
@@ -543,15 +571,28 @@ func (s *Service) QueryMetrics(ctx context.Context, actor auth.Principal, servic
 	if window <= 0 {
 		window = time.Hour
 	}
-	expr := `up`
-	points, _, err := telemetry.QueryPrometheusRange(ctx, s.promURL, expr, window, time.Minute)
-	if err != nil || len(points) == 0 {
-		return []telemetry.MetricSeries{
-			{Name: "cpu_seconds_total", Unit: "s", Points: []telemetry.MetricPoint{}},
-			{Name: "memory_bytes", Unit: "bytes", Points: []telemetry.MetricPoint{}},
-		}, nil
+	sid := serviceID.String()
+	cpuExpr := `rate(container_cpu_usage_seconds_total{container_label_nebula_service="` + sid + `"}[5m])`
+	memExpr := `container_memory_usage_bytes{container_label_nebula_service="` + sid + `"}`
+	empty := []telemetry.MetricSeries{
+		{Name: "cpu_usage", Unit: "cores", Points: []telemetry.MetricPoint{}},
+		{Name: "memory_bytes", Unit: "bytes", Points: []telemetry.MetricPoint{}},
 	}
-	return []telemetry.MetricSeries{{Name: "up", Unit: "bool", Points: points}}, nil
+	cpuPts, _, err := telemetry.QueryPrometheusRange(ctx, s.promURL, cpuExpr, window, time.Minute)
+	if err != nil {
+		return empty, nil
+	}
+	memPts, _, err := telemetry.QueryPrometheusRange(ctx, s.promURL, memExpr, window, time.Minute)
+	if err != nil {
+		memPts = nil
+	}
+	if len(cpuPts) == 0 && len(memPts) == 0 {
+		return empty, nil
+	}
+	return []telemetry.MetricSeries{
+		{Name: "cpu_usage", Unit: "cores", Points: cpuPts},
+		{Name: "memory_bytes", Unit: "bytes", Points: memPts},
+	}, nil
 }
 
 // CountServices validates viewer access before counting services.

@@ -31,11 +31,8 @@ export function FeatureGrid() {
             {t("platform")}
           </p>
           <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            {t.rich("title", {
-              highlight: () => (
-                <span className="text-gradient">{t("titleHighlight")}</span>
-              ),
-            })}
+            {t("titlePrefix")}{" "}
+            <span className="text-gradient">{t("titleHighlight")}</span> {t("titleSuffix")}
           </h2>
           <p className="mt-4 text-balance text-muted-foreground">{t("subtitle")}</p>
         </div>

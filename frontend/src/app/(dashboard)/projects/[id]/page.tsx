@@ -100,13 +100,23 @@ export default function ProjectOverviewPage() {
                     size="sm"
                     variant="default"
                     className="h-7 px-2 text-[11px]"
+                    disabled={!project.repo_url?.trim()}
+                    title={!project.repo_url?.trim() ? t("deployNeedsRepo") : undefined}
                     onClick={async () => {
-                      await api(`/api/v1/services/${s.id}/deployments`, {
-                        method: "POST",
-                        body: {},
-                      });
-                      await qc.invalidateQueries({ queryKey: ["deployments"] });
-                      router.push(`/projects/${id}/deployments`);
+                      if (!project.repo_url?.trim()) {
+                        toast.message(t("connectRepoFirst"));
+                        return;
+                      }
+                      try {
+                        await api(`/api/v1/services/${s.id}/deployments`, {
+                          method: "POST",
+                          body: {},
+                        });
+                        await qc.invalidateQueries({ queryKey: ["deployments"] });
+                        router.push(`/projects/${id}/deployments`);
+                      } catch (e) {
+                        toast.error(e instanceof ApiError ? e.message : t("deployFailed"));
+                      }
                     }}
                   >
                     {t("deploy")}

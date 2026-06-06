@@ -127,7 +127,14 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
                     </p>
                   </TableCell>
                   <TableCell>
-                    <StatusPill status={d.status} />
+                    <div className="space-y-1">
+                      <StatusPill status={d.status} />
+                      {d.status === "failed" && d.error_message && (
+                        <p className="max-w-[220px] truncate text-[11px] text-destructive" title={d.error_message}>
+                          {d.error_message}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant="muted">{d.trigger}</Badge>

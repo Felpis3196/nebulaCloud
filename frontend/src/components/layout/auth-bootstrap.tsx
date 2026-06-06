@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { ensurePersonalOrganization } from "@/lib/ensure-organization";
 import { useAuthStore } from "@/stores/auth-store";
 
 /**
@@ -12,6 +14,7 @@ import { useAuthStore } from "@/stores/auth-store";
  */
 export function AuthBootstrap() {
   const router = useRouter();
+  const qc = useQueryClient();
   const hydrate = useAuthStore((s) => s.hydrate);
   const fetchMe = useAuthStore((s) => s.fetchMe);
   const user = useAuthStore((s) => s.user);
@@ -23,8 +26,18 @@ export function AuthBootstrap() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    void fetchMe().then((me) => {
-      if (!cancelled && !me) router.replace("/login");
+    void fetchMe().then(async (me) => {
+      if (cancelled) return;
+      if (!me) {
+        router.replace("/login");
+        return;
+      }
+      try {
+        await ensurePersonalOrganization();
+        await qc.invalidateQueries({ queryKey: ["organizations"] });
+      } catch {
+        /* org ensure is best-effort on session restore */
+      }
     });
     return () => {
       cancelled = true;

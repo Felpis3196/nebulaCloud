@@ -7,7 +7,8 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 
 COMPOSE       ?= docker compose
-COMPOSE_DEV   := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
+# docker-compose.override.yml is auto-merged (frontend, api-dev, ports).
+COMPOSE_DEV   := $(COMPOSE)
 GO            ?= go
 GOFLAGS       ?=
 PKG           := ./...

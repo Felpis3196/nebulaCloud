@@ -1,0 +1,76 @@
+# ============================================================================
+# Traefik dynamic configuration (platform routes)
+# User app routes are written by runtime-agent into nebula-*.yml (same directory; Traefik does not load subfolders)
+# ============================================================================
+
+http:
+  # File-provider routes (work when Docker provider fails on Docker Desktop / WSL2).
+  # Compose service names resolve on network nebula_platform.
+  routers:
+    nebula-api:
+      rule: Host(`api.nebula.localhost`)
+      entryPoints: [web]
+      service: nebula-api
+      middlewares: [secure-headers]
+    nebula-app:
+      rule: Host(`app.nebula.localhost`)
+      entryPoints: [web]
+      service: nebula-app
+      middlewares: [secure-headers]
+    nebula-grafana:
+      rule: Host(`grafana.nebula.localhost`)
+      entryPoints: [web]
+      service: nebula-grafana
+    nebula-registry:
+      rule: Host(`registry.nebula.localhost`)
+      entryPoints: [web]
+      service: nebula-registry
+    nebula-traefik-dashboard:
+      rule: Host(`traefik.nebula.localhost`)
+      entryPoints: [web]
+      service: api@internal
+  services:
+    nebula-api:
+      loadBalancer:
+        servers:
+          - url: http://api:8080
+    nebula-app:
+      loadBalancer:
+        servers:
+          - url: http://frontend:3000
+    nebula-grafana:
+      loadBalancer:
+        servers:
+          - url: http://grafana:3000
+    nebula-registry:
+      loadBalancer:
+        servers:
+          - url: http://registry:5000
+
+  middlewares:
+    secure-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: strict-origin-when-cross-origin
+        contentSecurityPolicy: "default-src 'self'"
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        customResponseHeaders:
+          X-Powered-By: "NebulaCloud"
+
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+
+    compress:
+      compress: {}
+
+    api-strip:
+      stripPrefix:
+        prefixes:
+          - /api

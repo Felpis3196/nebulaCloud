@@ -1,0 +1,80 @@
+# ============================================================================
+# NebulaCloud — development overrides (auto-merged by Docker Compose)
+#
+# Compose loads this file automatically with docker-compose.yml when you run:
+#   docker compose up -d --build
+#
+# Skipped if you pass only the base file:
+#   docker compose -f docker-compose.yml up -d
+# ============================================================================
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  registry:
+    ports:
+      - "5000:5000"
+
+  grafana:
+    ports:
+      - "3001:3000"
+
+  # cAdvisor layerdb warnings on Docker Desktop/WSL2 are benign but noisy in dev logs.
+  # Enable with: docker compose --profile metrics up -d
+  cadvisor:
+    profiles: ["metrics"]
+
+  api:
+    build:
+      target: api-dev
+    environment:
+      NEBULA_LOG_LEVEL: debug
+      NEBULA_ENV: development
+      NEBULA_AUTO_MIGRATE: "true"
+      NEBULA_TERMINAL_ENABLED: "true"
+      NEBULA_APP_URL: http://localhost:3000
+    ports:
+      # Host 8080 is Traefik dashboard in docker-compose.yml; API direct access uses 8081.
+      - "8081:8080"
+      - "9100:9100" # /metrics
+    volumes:
+      - ./backend:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # ==========================================================================
+  # Frontend (Next.js 15 dashboard) — dev only
+  # ==========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      # localhost:8081 = API direct port (Traefik *.localhost may 404 on Docker Desktop until recreated)
+      NEXT_PUBLIC_API_URL: http://localhost:8081
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_GITHUB_URL: https://github.com/Felpis3196/nebulaCloud
+      NEXT_PUBLIC_GITHUB_BRANCH: master
+      WATCHPACK_POLLING: "true"   # reliable HMR on Docker Desktop
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    networks:
+      - nebula_platform
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`app.nebula.localhost`)
+      - traefik.http.routers.app.entrypoints=web
+      - traefik.http.services.app.loadbalancer.server.port=3000
+      - traefik.http.routers.app.middlewares=secure-headers@file

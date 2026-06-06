@@ -27,6 +27,8 @@ export class ApiError extends Error {
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
   skipAuth?: boolean;
+  /** Send cookies (e.g. GitHub OAuth token cookie on the API host). */
+  withCredentials?: boolean;
   /** Internal: when set, suppresses the auto-refresh-and-retry flow. */
   _retried?: boolean;
 }
@@ -64,10 +66,11 @@ async function refreshSession(): Promise<TokenPair> {
 }
 
 async function rawFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, skipAuth, headers, _retried, ...rest } = options;
+  const { body, skipAuth, withCredentials, headers, _retried, ...rest } = options;
 
   const init: RequestInit = {
     ...rest,
+    credentials: withCredentials ? "include" : rest.credentials,
     headers: {
       Accept: "application/json",
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -126,4 +129,9 @@ export async function apiEnvelope<T>(
   options: RequestOptions = {},
 ): Promise<ApiEnvelope<T>> {
   return rawFetch<ApiEnvelope<T>>(path, options);
+}
+
+/** API call that includes cookies (GitHub OAuth session on the API origin). */
+export async function apiWithCredentials<T>(path: string): Promise<T> {
+  return api<T>(path, { skipAuth: true, withCredentials: true });
 }
