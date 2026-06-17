@@ -18,6 +18,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nebulacloud/nebula/internal/buildworker"
 	"github.com/nebulacloud/nebula/internal/jobs"
 	projectsinfra "github.com/nebulacloud/nebula/internal/modules/projects/infrastructure"
 	"github.com/nebulacloud/nebula/internal/platform/config"
@@ -268,11 +269,7 @@ func publishDeployLog(ctx context.Context, pub *logstream.Publisher, deploymentI
 }
 
 func shorten(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) > 4000 {
-		return s[:4000] + "…"
-	}
-	return s
+	return buildworker.Excerpt(s, buildworker.DefaultExcerptLimit)
 }
 
 // nudgeTraefikReload asks the Traefik container to reload file config (helps Docker Desktop file watch).

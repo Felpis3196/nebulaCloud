@@ -30,8 +30,11 @@ func TestDeployRoute_FileBody_port3000(t *testing.T) {
 	if !strings.Contains(body, "Host(`web-1.app-1.nebula.localhost`)") {
 		t.Fatalf("host rule missing: %s", body)
 	}
-	if !strings.Contains(body, "http://nebula-svc-027258e7f0fc:3000") {
-		t.Fatalf("backend url missing: %s", body)
+	if !strings.Contains(body, `- url: "http://nebula-svc-027258e7f0fc:3000"`) {
+		t.Fatalf("backend url should be a double-quoted YAML scalar: %s", body)
+	}
+	if strings.Contains(body, "`http://") {
+		t.Fatalf("backend url must not be backtick-wrapped (invalid YAML): %s", body)
 	}
 }
 

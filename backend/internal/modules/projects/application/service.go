@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nebulacloud/nebula/internal/jobs"
+	"github.com/nebulacloud/nebula/internal/buildworker"
 	"github.com/nebulacloud/nebula/internal/modules/audit"
 	projectsinfra "github.com/nebulacloud/nebula/internal/modules/projects/infrastructure"
 	"github.com/nebulacloud/nebula/internal/platform/auth"
@@ -237,6 +238,31 @@ func (s *Service) UpdateProject(ctx context.Context, actor auth.Principal, proje
 		return projectsinfra.ProjectRow{}, err
 	}
 	return s.repo.UpdateProject(ctx, projectID, name, description, repoURL, branch)
+}
+
+// AnalyzeRepo runs advisory checks for a project repository URL and branch.
+func (s *Service) AnalyzeRepo(ctx context.Context, actor auth.Principal, projectID uuid.UUID, repoURL, branch *string) (buildworker.RepoAnalysis, error) {
+	p, err := s.repo.GetProject(ctx, projectID)
+	if err != nil {
+		return buildworker.RepoAnalysis{}, err
+	}
+	if err := s.authorizeOrg(ctx, actor, p.OrganizationID, auth.RoleViewer); err != nil {
+		return buildworker.RepoAnalysis{}, err
+	}
+	urlStr := ""
+	if repoURL != nil {
+		urlStr = strings.TrimSpace(*repoURL)
+	} else if p.RepoURL != nil {
+		urlStr = strings.TrimSpace(*p.RepoURL)
+	}
+	branchStr := p.DefaultBranch
+	if branch != nil && strings.TrimSpace(*branch) != "" {
+		branchStr = strings.TrimSpace(*branch)
+	}
+	if urlStr == "" {
+		return buildworker.RepoAnalysis{OK: false, Warnings: []string{"Repository URL is required."}}, nil
+	}
+	return buildworker.FullRepoAnalysis(ctx, urlStr, branchStr), nil
 }
 
 func (s *Service) authorizeService(ctx context.Context, actor auth.Principal, serviceID uuid.UUID, min auth.Role) (projectsinfra.ServiceRow, error) {

@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { DeploymentLogViewer } from "@/components/deployments/deployment-log-viewer";
 import { useDeploymentBuildLogs } from "@/hooks/use-deployment-build-logs";
+import { useDeployment } from "@/hooks/use-deployment";
 import { useDeploymentLogStream } from "@/hooks/use-deployment-log-stream";
 import type { BuildLogLine, Deployment, DeploymentStatus } from "@/types/api";
 import { formatDuration, relativeTime, shortSha } from "@/lib/utils";
@@ -31,7 +32,8 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  deployment: Deployment | null;
+  deploymentId: string | null;
+  initialDeployment?: Deployment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -65,8 +67,9 @@ function activePhase(status: DeploymentStatus): number {
     case "queued":
       return 0;
     case "building":
-    case "pushing":
       return 3;
+    case "pushing":
+      return 4;
     case "deploying":
       return 5;
     case "running":
@@ -112,12 +115,21 @@ function mergeLogLines(history: BuildLogLine[], live: BuildLogLine[]): BuildLogL
   return out;
 }
 
-export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props) {
+export function DeploymentDetailDrawer({
+  deploymentId,
+  initialDeployment,
+  open,
+  onOpenChange,
+}: Props) {
   const t = useTranslations("deployments.drawer");
+  const { data: polled } = useDeployment(open ? deploymentId ?? undefined : undefined, open);
+  const deployment = polled ?? initialDeployment ?? null;
   const depId = deployment?.id;
+  const depStatus = deployment?.status;
   const pollLogs =
     !!deployment &&
-    ["queued", "building", "pushing", "deploying", "failed"].includes(deployment.status);
+    !!depStatus &&
+    ["queued", "building", "pushing", "deploying", "failed"].includes(depStatus);
   const { data: history = [], isLoading: logsLoading, refetch } = useDeploymentBuildLogs(
     open ? depId : undefined,
     open && pollLogs,
@@ -132,7 +144,8 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
 
   if (!deployment) return null;
 
-  const isFailed = deployment.status === "failed";
+  const status = deployment.status;
+  const isFailed = status === "failed";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -145,7 +158,7 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
               <span className="text-muted-foreground">{deployment.service_name}</span>
             </SheetTitle>
             <SheetDescription className="flex flex-wrap items-center gap-2 pt-1">
-              <StatusPill status={deployment.status} />
+              <StatusPill status={status} />
               <Badge variant="muted" className="font-mono">
                 {shortSha(deployment.commit_sha)}
               </Badge>
@@ -156,14 +169,19 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto pr-1">
-          {isFailed && deployment.error_message && (
+          {isFailed && (deployment.error_hint || deployment.error_message) && (
             <div className="flex gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-              <div className="min-w-0 space-y-1">
+              <div className="min-w-0 space-y-2">
                 <p className="font-medium text-destructive">{t("deployFailed")}</p>
-                <p className="whitespace-pre-wrap break-words font-mono text-xs text-destructive/90">
-                  {deployment.error_message}
-                </p>
+                {deployment.error_hint && (
+                  <p className="text-sm leading-relaxed text-amber-200/90">{deployment.error_hint}</p>
+                )}
+                {deployment.error_message && (
+                  <p className="whitespace-pre-wrap break-words font-mono text-xs text-destructive/90">
+                    {deployment.error_message}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -188,7 +206,7 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
             </h3>
             <ol className="space-y-2">
               {PIPELINE_STEPS.map((step, i) => {
-                const visual = stepVisual(step.phase, deployment.status, deployment.error_message);
+                const visual = stepVisual(step.phase, status, deployment.error_message);
                 return (
                   <li
                     key={step.key}
@@ -239,7 +257,7 @@ export function DeploymentDetailDrawer({ deployment, open, onOpenChange }: Props
             />
           </section>
 
-          {(deployment.status === "running" || deployment.status === "deploying") &&
+          {(status === "running" || status === "deploying") &&
             deployment.route_host && (
               <section className="space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

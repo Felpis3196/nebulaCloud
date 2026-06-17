@@ -87,8 +87,16 @@ export interface Project {
   /** GitHub App installation id when linked (webhook matching). */
   github_installation_id?: number;
   services_count: number;
+  repo_warnings?: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface RepoAnalysis {
+  ok: boolean;
+  warnings?: string[];
+  hints?: string[];
+  stack?: string;
 }
 
 export interface Service {
@@ -144,6 +152,7 @@ export interface Deployment {
   ref?: string;
   image_ref?: string;
   error_message?: string;
+  error_hint?: string;
   route_host?: string;
   listen_port?: number;
   duration_ms?: number;

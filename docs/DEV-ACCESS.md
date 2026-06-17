@@ -206,6 +206,8 @@ Com repositório público que tenha **Dockerfile** na raiz (recomendado para dep
 
 **Evitar:** `octocat/Hello-World` — não tem Dockerfile nem buildpack detectável; o build falha.
 
+**Análise de repositório (advisory):** na UI, ao conectar um repo use **Analisar repositório** (`POST /api/v1/projects/{id}/analyze-repo`). Avisos conhecidos (ex. `docker/getting-started`) aparecem antes do deploy; o usuário pode implantar mesmo assim. O campo `repo_warnings` no projeto resume avisos estáticos; o build-worker publica `warning:` nos logs após o clone.
+
 Exemplo Teste C (deploy até container):
 
 ```powershell

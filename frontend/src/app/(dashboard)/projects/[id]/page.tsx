@@ -1,12 +1,21 @@
 "use client";
 
-import { ExternalLink, Server } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, ExternalLink, Server } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusPill } from "@/components/dashboard/status-pill";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { relativeTime } from "@/lib/utils";
 import { useProject } from "@/hooks/use-project";
 import { useServices } from "@/hooks/use-services";
@@ -24,12 +33,47 @@ export default function ProjectOverviewPage() {
 
   const { data: project, isLoading } = useProject(id);
   const { data: services = [] } = useServices(id);
+  const [deployConfirmOpen, setDeployConfirmOpen] = useState(false);
+  const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
+  const [deploying, setDeploying] = useState(false);
+
+  async function startDeploy(serviceId: string) {
+    setDeploying(true);
+    try {
+      await api(`/api/v1/services/${serviceId}/deployments`, {
+        method: "POST",
+        body: {},
+      });
+      await qc.invalidateQueries({ queryKey: ["deployments"] });
+      router.push(`/projects/${id}/deployments`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("deployFailed"));
+    } finally {
+      setDeploying(false);
+      setDeployConfirmOpen(false);
+      setPendingServiceId(null);
+    }
+  }
+
+  function requestDeploy(serviceId: string) {
+    if (!project?.repo_url?.trim()) {
+      toast.message(t("connectRepoFirst"));
+      return;
+    }
+    if ((project.repo_warnings?.length ?? 0) > 0) {
+      setPendingServiceId(serviceId);
+      setDeployConfirmOpen(true);
+      return;
+    }
+    void startDeploy(serviceId);
+  }
 
   if (isLoading || !project) {
     return <div className="text-sm text-muted-foreground">{tCommon("loading")}</div>;
   }
 
   return (
+    <>
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -102,22 +146,7 @@ export default function ProjectOverviewPage() {
                     className="h-7 px-2 text-[11px]"
                     disabled={!project.repo_url?.trim()}
                     title={!project.repo_url?.trim() ? t("deployNeedsRepo") : undefined}
-                    onClick={async () => {
-                      if (!project.repo_url?.trim()) {
-                        toast.message(t("connectRepoFirst"));
-                        return;
-                      }
-                      try {
-                        await api(`/api/v1/services/${s.id}/deployments`, {
-                          method: "POST",
-                          body: {},
-                        });
-                        await qc.invalidateQueries({ queryKey: ["deployments"] });
-                        router.push(`/projects/${id}/deployments`);
-                      } catch (e) {
-                        toast.error(e instanceof ApiError ? e.message : t("deployFailed"));
-                      }
-                    }}
+                    onClick={() => requestDeploy(s.id)}
                   >
                     {t("deploy")}
                   </Button>
@@ -144,6 +173,39 @@ export default function ProjectOverviewPage() {
         </CardContent>
       </Card>
     </div>
+
+    <Dialog open={deployConfirmOpen} onOpenChange={setDeployConfirmOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            {t("deployConfirmTitle")}
+          </DialogTitle>
+          <DialogDescription>{t("deployConfirmDesc")}</DialogDescription>
+        </DialogHeader>
+        <ul className="max-h-48 space-y-2 overflow-y-auto text-sm text-muted-foreground">
+          {project.repo_warnings?.map((w) => (
+            <li key={w} className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-100/90">
+              {w}
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setDeployConfirmOpen(false)}>
+            {t("deployCancel")}
+          </Button>
+          <Button
+            type="button"
+            variant="default"
+            disabled={deploying || !pendingServiceId}
+            onClick={() => pendingServiceId && void startDeploy(pendingServiceId)}
+          >
+            {deploying ? tCommon("loading") : t("deployAnyway")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
 

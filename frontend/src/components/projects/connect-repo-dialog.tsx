@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Github, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Github, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -33,7 +33,7 @@ import {
   readGitHubReposFromSession,
   type GitHubRepoOption,
 } from "@/lib/github-oauth";
-import type { Project } from "@/types/api";
+import type { Project, RepoAnalysis } from "@/types/api";
 import { useTranslations } from "next-intl";
 
 const webhookURL = `${env.NEXT_PUBLIC_API_URL}/api/v1/webhooks/github`;
@@ -64,6 +64,31 @@ export function ConnectRepoDialog({ projectId, trigger, open: controlledOpen, on
   const [installationId, setInstallationId] = useState("");
   const [githubRepos, setGithubRepos] = useState<GitHubRepoOption[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<RepoAnalysis | null>(null);
+
+  const runAnalysis = useCallback(async () => {
+    if (!projectId || !repo.trim()) {
+      setAnalysis(null);
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const result = await api<RepoAnalysis>(`/api/v1/projects/${projectId}/analyze-repo`, {
+        method: "POST",
+        body: {
+          repo_url: repo.trim(),
+          default_branch: branch.trim() || "main",
+        },
+      });
+      setAnalysis(result);
+    } catch (err) {
+      setAnalysis(null);
+      toast.error(err instanceof ApiError ? err.message : t("analysisFailed"));
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [projectId, repo, branch, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +110,7 @@ export function ConnectRepoDialog({ projectId, trigger, open: controlledOpen, on
     setBranch("main");
     setInstallationId("");
     setSelectedRepo("");
+    setAnalysis(null);
     setGithubRepos(readGitHubReposFromSession());
   }
 
@@ -131,7 +157,11 @@ export function ConnectRepoDialog({ projectId, trigger, open: controlledOpen, on
       await qc.invalidateQueries({ queryKey: ["projects"] });
       clearGitHubReposSession();
       setOpen(false);
+      const hasWarnings = (analysis?.warnings?.length ?? 0) > 0;
       toast.success(trimmedInst ? t("savedWithInstall") : t("savedRepoOnly"));
+      if (hasWarnings) {
+        toast.warning(t("savedWithWarnings"), { duration: 10000 });
+      }
       toast.info(t("nextStepAddService"), { duration: 8000 });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("saveFailed"));
@@ -201,8 +231,76 @@ export function ConnectRepoDialog({ projectId, trigger, open: controlledOpen, on
             required
             placeholder={t("repoPlaceholder")}
             value={repo}
-            onChange={(e) => setRepo(e.target.value)}
+            onChange={(e) => {
+              setRepo(e.target.value);
+              setAnalysis(null);
+            }}
+            onBlur={() => {
+              if (repo.trim() && projectId) void runAnalysis();
+            }}
           />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!projectId || !repo.trim() || analyzing}
+            onClick={() => void runAnalysis()}
+          >
+            {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {analyzing ? t("analyzing") : t("analyzeRepo")}
+          </Button>
+        </div>
+        {analysis && (analysis.warnings?.length || analysis.hints?.length) ? (
+          <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm">
+            <div className="flex items-center gap-2 font-medium text-amber-200">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {t("analysisWarnings")}
+            </div>
+            {analysis.warnings?.map((w) => (
+              <p key={w} className="text-sm leading-relaxed text-amber-100/90">
+                {w}
+              </p>
+            ))}
+            {analysis.hints && analysis.hints.length > 0 && (
+              <div className="space-y-1 border-t border-amber-500/20 pt-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/80">
+                  {t("analysisHints")}
+                </p>
+                {analysis.hints.map((h) => (
+                  <p key={h} className="text-xs leading-relaxed text-amber-100/80">
+                    {h}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+        <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          <p className="mb-1 font-medium text-foreground">{t("recommendedRepos")}</p>
+          <ul className="list-inside list-disc space-y-0.5">
+            <li>
+              <a
+                href="https://github.com/docker/welcome-to-docker"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                docker/welcome-to-docker
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                tiangolo/uvicorn-gunicorn-fastapi-docker
+              </a>
+            </li>
+          </ul>
         </div>
         <div className="space-y-2">
           <Label htmlFor="branch">{t("defaultBranch")}</Label>

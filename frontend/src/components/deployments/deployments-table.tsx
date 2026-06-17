@@ -30,7 +30,11 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
   const [status, setStatus] = useState<DeploymentStatus | "all">("all");
   const [project, setProject] = useState<string>("all");
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Deployment | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedInitial = useMemo(
+    () => (selectedId ? deployments.find((d) => d.id === selectedId) ?? null : null),
+    [selectedId, deployments],
+  );
 
   const projects = Array.from(new Set(deployments.map((d) => d.project_name)));
 
@@ -108,7 +112,7 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
               {rows.map((d) => (
                 <TableRow
                   key={d.id}
-                  onClick={() => setSelected(d)}
+                  onClick={() => setSelectedId(d.id)}
                   className="cursor-pointer"
                 >
                   <TableCell>
@@ -129,9 +133,12 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
                   <TableCell>
                     <div className="space-y-1">
                       <StatusPill status={d.status} />
-                      {d.status === "failed" && d.error_message && (
-                        <p className="max-w-[220px] truncate text-[11px] text-destructive" title={d.error_message}>
-                          {d.error_message}
+                      {d.status === "failed" && (d.error_hint || d.error_message) && (
+                        <p
+                          className="max-w-[220px] truncate text-[11px] text-destructive"
+                          title={d.error_hint ?? d.error_message}
+                        >
+                          {d.error_hint ?? d.error_message}
                         </p>
                       )}
                     </div>
@@ -160,9 +167,10 @@ export function DeploymentsTable({ deployments }: { deployments: Deployment[] })
       </Card>
 
       <DeploymentDetailDrawer
-        deployment={selected}
-        open={selected !== null}
-        onOpenChange={(o) => !o && setSelected(null)}
+        deploymentId={selectedId}
+        initialDeployment={selectedInitial}
+        open={selectedId !== null}
+        onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>
   );

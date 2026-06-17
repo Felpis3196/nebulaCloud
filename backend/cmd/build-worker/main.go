@@ -168,6 +168,14 @@ func buildHandler(pool *pgxpool.Pool, cfg config.Config, prod platformqueue.Prod
 		}
 		publishBuildLog(ctx, logPub, p.DeploymentID, "source cloned ("+shaNote+")", "info")
 
+		wsAnalysis := buildworker.AnalyzeWorkspace(workDir, dfRel)
+		for _, w := range wsAnalysis.Warnings {
+			publishBuildLog(ctx, logPub, p.DeploymentID, "warning: "+w, "warn")
+		}
+		for _, hint := range wsAnalysis.Hints {
+			publishBuildLog(ctx, logPub, p.DeploymentID, "hint: "+hint, "warn")
+		}
+
 		_ = repo.UpdateBuildFields(ctx, buildID, host, "detecting", nil, nil, nil)
 		publishBuildLog(ctx, logPub, p.DeploymentID, "detecting stack", "info")
 		mode, detected, err := buildworker.DetectStack(workDir, dfRel)
@@ -198,6 +206,9 @@ func buildHandler(pool *pgxpool.Pool, cfg config.Config, prod platformqueue.Prod
 		}
 
 		_ = repo.UpdateBuildFields(ctx, buildID, host, "pushing", &detected, nil, nil)
+		if err := repo.UpdateDeploymentWorker(ctx, depID, "pushing", nil, nil); err != nil {
+			log.Warn("deployment.pushing_marker", "err", err)
+		}
 		publishBuildLog(ctx, logPub, p.DeploymentID, "pushing image to registry", "info")
 
 		psh := exec.CommandContext(ctx, "docker", "push", img)
@@ -255,11 +266,7 @@ func buildHandler(pool *pgxpool.Pool, cfg config.Config, prod platformqueue.Prod
 }
 
 func shorten(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) > 4000 {
-		return s[:4000] + "…"
-	}
-	return s
+	return buildworker.Excerpt(s, buildworker.DefaultExcerptLimit)
 }
 
 func publishBuildLog(ctx context.Context, pub *logstream.Publisher, deploymentID, msg, level string) {
@@ -277,6 +284,7 @@ func publishBuildLog(ctx context.Context, pub *logstream.Publisher, deploymentID
 
 func publishErrorOutput(ctx context.Context, pub *logstream.Publisher, deploymentID, raw string) {
 	publishBuildLog(ctx, pub, deploymentID, "build failed: "+shorten(raw), "error")
+	publishFailureHint(ctx, pub, deploymentID, raw)
 	for _, line := range tailLines(raw, 40) {
 		publishBuildLog(ctx, pub, deploymentID, line, "error")
 	}
@@ -290,10 +298,17 @@ func tailLines(s string, max int) []string {
 	return lines[len(lines)-max:]
 }
 
+func publishFailureHint(ctx context.Context, pub *logstream.Publisher, deploymentID, raw string) {
+	if hint := buildworker.DiagnoseFailure(raw); hint != "" {
+		publishBuildLog(ctx, pub, deploymentID, "hint: "+hint, "warn")
+	}
+}
+
 func fail(repo *projectsinfra.Repository, ctx context.Context, wid string, dep, build uuid.UUID, pub *logstream.Publisher, deploymentID string, err error) error {
 	msg := err.Error()
 	code := 1
 	publishBuildLog(ctx, pub, deploymentID, "build failed: "+shorten(msg), "error")
+	publishFailureHint(ctx, pub, deploymentID, msg)
 	_ = repo.UpdateBuildFields(ctx, build, wid, "failed", nil, &msg, &code)
 	_ = repo.UpdateDeploymentWorker(ctx, dep, "failed", nil, &msg)
 	if sid, e2 := repo.DeploymentServiceID(ctx, dep); e2 == nil {

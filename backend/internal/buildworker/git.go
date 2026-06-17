@@ -160,9 +160,5 @@ func shallowFetchCommit(ctx context.Context, workDir, repoURL, sha string) error
 }
 
 func trimOut(b []byte) string {
-	s := strings.TrimSpace(string(b))
-	if len(s) > 4000 {
-		return s[:4000] + "…"
-	}
-	return s
+	return Excerpt(string(b), DefaultExcerptLimit)
 }

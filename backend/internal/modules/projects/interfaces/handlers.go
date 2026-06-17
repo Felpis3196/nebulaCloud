@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	projectsapp "github.com/nebulacloud/nebula/internal/modules/projects/application"
 	projectsinfra "github.com/nebulacloud/nebula/internal/modules/projects/infrastructure"
+	"github.com/nebulacloud/nebula/internal/buildworker"
 	"github.com/nebulacloud/nebula/internal/platform/auth"
 	platformerrors "github.com/nebulacloud/nebula/internal/platform/errors"
 	"github.com/nebulacloud/nebula/internal/platform/httpx"
@@ -66,6 +68,7 @@ func (h *Handler) Mount(r chi.Router) {
 	r.Route("/projects/{projectID}", func(rr chi.Router) {
 		rr.Get("/", h.getProject)
 		rr.Patch("/", h.patchProject)
+		rr.Post("/analyze-repo", h.analyzeRepo)
 		rr.Get("/services", h.listServices)
 		rr.Post("/services", h.createService)
 		rr.Get("/deployments", h.listDeploymentsByProject)
@@ -200,21 +203,22 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 // --- Projects ---
 
 type projectDTO struct {
-	ID                     string  `json:"id"`
-	OrganizationID         string  `json:"organization_id"`
-	Slug                   string  `json:"slug"`
-	Name                   string  `json:"name"`
-	Description            *string `json:"description,omitempty"`
-	RepoURL                *string `json:"repo_url,omitempty"`
-	DefaultBranch          string  `json:"default_branch"`
-	GitHubInstallationID   *int64  `json:"github_installation_id,omitempty"`
-	ServicesCount          int     `json:"services_count"`
-	CreatedAt              string  `json:"created_at"`
-	UpdatedAt              string  `json:"updated_at"`
+	ID                     string   `json:"id"`
+	OrganizationID         string   `json:"organization_id"`
+	Slug                   string   `json:"slug"`
+	Name                   string   `json:"name"`
+	Description            *string  `json:"description,omitempty"`
+	RepoURL                *string  `json:"repo_url,omitempty"`
+	DefaultBranch          string   `json:"default_branch"`
+	GitHubInstallationID   *int64   `json:"github_installation_id,omitempty"`
+	ServicesCount          int      `json:"services_count"`
+	RepoWarnings           []string `json:"repo_warnings,omitempty"`
+	CreatedAt              string   `json:"created_at"`
+	UpdatedAt              string   `json:"updated_at"`
 }
 
 func toProjectDTO(p projectsinfra.ProjectRow, svcCount int) projectDTO {
-	return projectDTO{
+	dto := projectDTO{
 		ID:                   p.ID.String(),
 		OrganizationID:       p.OrganizationID.String(),
 		Slug:                 p.Slug,
@@ -227,6 +231,13 @@ func toProjectDTO(p projectsinfra.ProjectRow, svcCount int) projectDTO {
 		CreatedAt:            p.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt:            p.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+	if p.RepoURL != nil && strings.TrimSpace(*p.RepoURL) != "" {
+		dto.RepoWarnings = buildworker.RepoWarningsFromURL(*p.RepoURL, p.DefaultBranch)
+		if len(dto.RepoWarnings) == 0 {
+			dto.RepoWarnings = nil
+		}
+	}
+	return dto
 }
 
 func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
@@ -343,6 +354,37 @@ func (h *Handler) getProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, toProjectDTO(row, cnt))
+}
+
+type analyzeRepoBody struct {
+	RepoURL       *string `json:"repo_url,omitempty"`
+	DefaultBranch *string `json:"default_branch,omitempty"`
+}
+
+func (h *Handler) analyzeRepo(w http.ResponseWriter, r *http.Request) {
+	pr, ok := principal(r)
+	if !ok {
+		httpx.Error(w, platformerrors.Unauthorized("not authenticated"))
+		return
+	}
+	pid, ok2 := parseUUID(chi.URLParam(r, "projectID"), w)
+	if !ok2 {
+		return
+	}
+	var body analyzeRepoBody
+	if r.Body != nil {
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&body); err != nil && err != io.EOF {
+			httpx.Error(w, platformerrors.Validation("invalid JSON body").WithCause(err))
+			return
+		}
+	}
+	analysis, err := h.svc.AnalyzeRepo(r.Context(), pr, pid, body.RepoURL, body.DefaultBranch)
+	if err != nil {
+		httpx.Error(w, err)
+		return
+	}
+	httpx.OK(w, analysis)
 }
 
 // --- Services ---
@@ -632,6 +674,7 @@ type deploymentDTO struct {
 	Ref           *string              `json:"ref,omitempty"`
 	ImageRef      *string              `json:"image_ref,omitempty"`
 	ErrorMessage  *string              `json:"error_message,omitempty"`
+	ErrorHint     *string              `json:"error_hint,omitempty"`
 	RouteHost     *string              `json:"route_host,omitempty"`
 	ListenPort    *int                 `json:"listen_port,omitempty"`
 	DurationMs    int64                `json:"duration_ms,omitempty"`
@@ -696,6 +739,11 @@ func (h *Handler) toDeployDTO(j projectsinfra.DeploymentJoined) deploymentDTO {
 	}
 	d.Ref = j.Ref
 	d.ErrorMessage = j.ErrorMessage
+	if j.ErrorMessage != nil {
+		if hint := buildworker.DiagnoseFailure(*j.ErrorMessage); hint != "" {
+			d.ErrorHint = &hint
+		}
+	}
 	d.StartedAt = timePtrRFC(j.StartedAt)
 	d.FinishedAt = timePtrRFC(j.FinishedAt)
 	if j.TriggeredBy != nil && j.TriggerEmail != nil {

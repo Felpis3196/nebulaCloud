@@ -183,24 +183,26 @@
   "dashboard": {
     "overview": {
       "title": "Visão geral",
-      "subtitle": "Resumo do workspace — contagens ao vivo da API onde indicado; gráficos são apenas ilustrativos.",
+      "subtitle": "Resumo ao vivo do workspace — projetos, serviços e implantações da sua organização.",
       "mvpBanner": "Transparência MVP:",
-      "mvpText": "totais de projetos e serviços vêm da sua organização. A lista de implantações recentes usa apenas o primeiro projeto até existir feed do workspace. Gráficos sparkline não usam APIs de métricas.",
+      "mvpText": "O histórico de implantações agrega todos os projetos da organização selecionada. Métricas de infraestrutura (CPU, taxa de requisições) ainda não existem por org — veja",
+      "metricsLink": "Métricas",
       "projects": "Projetos",
       "projectsHint": "na organização selecionada",
       "servicesSum": "Linhas de serviço (soma)",
       "servicesHint": "de project.services_count",
       "deploysToday": "Deploys hoje (UTC)",
-      "deploysHintFirst": "apenas primeiro projeto",
+      "deploysHintAll": "em toda a organização",
       "deploysHintNone": "crie um projeto primeiro",
-      "clusterUptime": "Uptime do cluster",
-      "clusterHint": "não exposto no MVP",
-      "requestRate": "Taxa de requisições",
-      "requestDesc": "Apenas ilustrativo — sem API de métricas por org.",
-      "cpuUsage": "Uso de CPU",
-      "cpuDesc": "Apenas ilustrativo — use métricas do projeto para amostras da API.",
-      "timelineWithProject": "Implantações do projeto “{name}” (primeiro da lista).",
-      "timelineEmpty": "Crie um projeto para ver o histórico de implantações aqui.",
+      "activeDeploys": "Deploys ativos",
+      "activeDeploysHint": "em build, push ou deploy agora",
+      "timelineOrgWide": "Implantações mais recentes em toda a organização.",
+      "timelineNoDeploys": "Nenhuma implantação nesta organização ainda.",
+      "timelineNoProjects": "Crie um projeto para ver o histórico de implantações aqui.",
+      "noProjectsTitle": "Nenhum projeto ainda",
+      "noProjectsDesc": "Crie um projeto e conecte um repositório GitHub para começar a implantar.",
+      "noDeploysTitle": "Sem dados disponíveis — nenhum deploy ainda",
+      "noDeploysDesc": "Conecte um repositório a um projeto e faça o primeiro deploy. Nada está rodando ou concluído ainda.",
       "deployCtaTitle": "Conectar um repositório GitHub",
       "deployCtaDesc": "Abra Projetos, crie um projeto e use Conectar repositório no cabeçalho do projeto.",
       "deployCtaButton": "Ir para projetos"
@@ -273,13 +275,22 @@
     },
     "activity": {
       "title": "Atividade",
-      "description": "Linha do tempo de exemplo (não conectada à API). Para histórico real use",
-      "deploymentsLink": "Implantações"
+      "description": "Eventos recentes de implantação da sua organização. Histórico completo em",
+      "deploymentsLink": "Implantações",
+      "loading": "Carregando atividade…",
+      "empty": "Nenhuma atividade ainda — sem deploys rodando ou concluídos.",
+      "deployed": "{project} / {service} está no ar",
+      "failed": "{project} / {service} falhou",
+      "inProgress": "{project} / {service} em andamento",
+      "other": "{project} / {service} — {status}"
     },
     "deployTimeline": {
       "title": "Implantações recentes",
       "defaultDesc": "Atividade mais recente em todos os serviços.",
-      "all": "Todas"
+      "all": "Todas",
+      "loading": "Carregando implantações…",
+      "empty": "Nenhuma implantação ainda. Conecte um repositório e implante a partir de um projeto.",
+      "emptyAction": "Ir para projetos"
     }
   },
   "projects": {
@@ -319,7 +330,14 @@
       "repoPlaceholder": "https://github.com/sua-org/seu-repo",
       "browseGitHub": "Procurar no GitHub",
       "pickRepo": "Repositório do GitHub",
-      "pickRepoPlaceholder": "Selecione um repositório"
+      "pickRepoPlaceholder": "Selecione um repositório",
+      "analyzeRepo": "Analisar repositório",
+      "analyzing": "Analisando…",
+      "analysisWarnings": "Avisos do repositório",
+      "analysisHints": "Sugestões",
+      "analysisFailed": "Não foi possível analisar o repositório",
+      "savedWithWarnings": "Repositório salvo — revise os avisos acima antes de implantar.",
+      "recommendedRepos": "Repositórios de teste recomendados"
     },
     "detail": {
       "addService": "Adicionar serviço",
@@ -338,6 +356,10 @@
       "deployNow": "Implantar agora",
       "connectRepoFirst": "Conecte um repositório antes de implantar",
       "deployNeedsRepo": "Conecte um repositório GitHub primeiro",
+      "deployConfirmTitle": "Implantar com avisos no repositório?",
+      "deployConfirmDesc": "Este repositório pode falhar no build. Você ainda pode implantar, mas revise os problemas abaixo.",
+      "deployAnyway": "Implantar mesmo assim",
+      "deployCancel": "Cancelar",
       "servicesCount": "{count} serviços",
       "missingProject": "Projeto ausente.",
       "loadingProject": "Carregando projeto…",

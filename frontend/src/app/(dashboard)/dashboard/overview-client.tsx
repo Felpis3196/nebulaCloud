@@ -1,43 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, Cpu, FolderGit2, Rocket, Timer } from "lucide-react";
+import { Activity, ArrowRight, FolderGit2, Rocket, Timer } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { DeployTimeline } from "@/components/dashboard/deploy-timeline";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
-import { ResourceMiniChart } from "@/components/dashboard/resource-mini-chart";
-import { makeSeries } from "@/lib/mock-data";
 import { useProjects } from "@/hooks/use-projects";
-import { useDeployments } from "@/hooks/use-deployments";
+import { useWorkspaceDeployments } from "@/hooks/use-workspace-deployments";
 import { useOrganizationStore } from "@/stores/org-store";
-import type { Deployment } from "@/types/api";
-
-function startOfTodayUtc(): number {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function deploysTodayUtc(deployments: Deployment[]): number {
-  const t0 = startOfTodayUtc();
-  return deployments.filter((d) => new Date(d.created_at).getTime() >= t0).length;
-}
 
 export function OverviewDashboardClient() {
   const t = useTranslations("dashboard.overview");
   const orgId = useOrganizationStore((s) => s.selectedOrganizationId);
   const { data: projects = [], isLoading: projectsLoading } = useProjects(orgId);
-  const firstProjectId = projects[0]?.id;
-  const { data: recentDeployments = [], isLoading: depLoading } = useDeployments(firstProjectId);
+  const {
+    deployments,
+    hasProjects,
+    isLoading: depLoading,
+    isEmpty: noDeploys,
+    activeCount,
+    deploysToday,
+  } = useWorkspaceDeployments(orgId);
 
   const totalProjects = projects.length;
   const totalServices = projects.reduce((acc, p) => acc + (p.services_count ?? 0), 0);
-  const todayDeploys = deploysTodayUtc(recentDeployments);
 
-  const requestsSeries = makeSeries("Requests", 240, 90);
-  const cpuSeries = makeSeries("CPU", 38, 22);
+  const timelineDescription = !orgId
+    ? t("timelineNoProjects")
+    : !hasProjects
+      ? t("timelineNoProjects")
+      : noDeploys
+        ? t("timelineNoDeploys")
+        : t("timelineOrgWide");
 
   return (
     <div className="space-y-6">
@@ -49,8 +45,30 @@ export function OverviewDashboardClient() {
       </header>
 
       <div className="rounded-md border border-border/80 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{t("mvpBanner")}</span> {t("mvpText")}
+        <span className="font-medium text-foreground">{t("mvpBanner")}</span> {t("mvpText")}{" "}
+        <Link href="/metrics" className="underline underline-offset-2">
+          {t("metricsLink")}
+        </Link>
+        .
       </div>
+
+      {!orgId || !hasProjects ? (
+        <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-center">
+          <p className="text-sm font-medium">{t("noProjectsTitle")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("noProjectsDesc")}</p>
+          <Button asChild variant="gradient" size="sm" className="mt-4">
+            <Link href="/projects">
+              {t("deployCtaButton")}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      ) : noDeploys && !depLoading ? (
+        <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-6 text-center">
+          <p className="text-sm font-medium">{t("noDeploysTitle")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("noDeploysDesc")}</p>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -87,48 +105,24 @@ export function OverviewDashboardClient() {
         <StatCard
           icon={Timer}
           label={t("deploysToday")}
-          value={
-            !firstProjectId ? "—" : depLoading ? "…" : String(todayDeploys)
-          }
-          hint={firstProjectId ? t("deploysHintFirst") : t("deploysHintNone")}
+          value={!orgId || !hasProjects ? "—" : depLoading ? "…" : String(deploysToday)}
+          hint={hasProjects ? t("deploysHintAll") : t("deploysHintNone")}
         />
         <StatCard
-          icon={Cpu}
-          label={t("clusterUptime")}
-          value="—"
-          hint={t("clusterHint")}
-        />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <ResourceMiniChart
-          title={t("requestRate")}
-          description={t("requestDesc")}
-          unit=" rpm"
-          series={requestsSeries}
-          color="hsl(239 84% 67%)"
-        />
-        <ResourceMiniChart
-          title={t("cpuUsage")}
-          description={t("cpuDesc")}
-          unit="%"
-          series={cpuSeries}
-          color="hsl(305 80% 65%)"
+          icon={Rocket}
+          label={t("activeDeploys")}
+          value={!orgId || !hasProjects ? "—" : depLoading ? "…" : String(activeCount)}
+          hint={t("activeDeploysHint")}
         />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
         <DeployTimeline
-          deployments={recentDeployments}
-          timelineDescription={
-            firstProjectId
-              ? t("timelineWithProject", {
-                  name: projects[0]?.name ?? projects[0]?.slug ?? "",
-                })
-              : t("timelineEmpty")
-          }
+          deployments={deployments}
+          loading={depLoading}
+          timelineDescription={timelineDescription}
         />
-        <ActivityFeed />
+        <ActivityFeed deployments={deployments} loading={depLoading} />
       </section>
     </div>
   );

@@ -183,24 +183,26 @@
   "dashboard": {
     "overview": {
       "title": "Overview",
-      "subtitle": "Workspace snapshot — live counts from the API where noted; charts are illustrative only.",
+      "subtitle": "Live workspace snapshot from your organization — projects, services, and deployments.",
       "mvpBanner": "MVP honesty:",
-      "mvpText": "project and service totals come from your organization. Recent deployments list uses the first project only until a workspace-wide feed exists. Sparkline charts are not backed by metrics APIs.",
+      "mvpText": "Deployment history is aggregated across all projects in the selected organization. Infrastructure metrics (CPU, request rate) are not available org-wide yet — see",
+      "metricsLink": "Metrics",
       "projects": "Projects",
       "projectsHint": "in selected organization",
       "servicesSum": "Service rows (sum)",
       "servicesHint": "from project.services_count",
       "deploysToday": "Deploys today (UTC)",
-      "deploysHintFirst": "first project only",
+      "deploysHintAll": "across organization",
       "deploysHintNone": "create a project first",
-      "clusterUptime": "Cluster uptime",
-      "clusterHint": "not exposed in MVP",
-      "requestRate": "Request rate",
-      "requestDesc": "Illustrative only — no org-wide metrics API yet.",
-      "cpuUsage": "CPU usage",
-      "cpuDesc": "Illustrative only — use project metrics for API-backed samples.",
-      "timelineWithProject": "Deployments from project “{name}” (first in list).",
-      "timelineEmpty": "Create a project to see deployment history here.",
+      "activeDeploys": "Active deploys",
+      "activeDeploysHint": "building, pushing, or deploying now",
+      "timelineOrgWide": "Latest deployments across your organization.",
+      "timelineNoDeploys": "No deployments yet in this organization.",
+      "timelineNoProjects": "Create a project to see deployment history here.",
+      "noProjectsTitle": "No projects yet",
+      "noProjectsDesc": "Create a project and connect a GitHub repository to start deploying.",
+      "noDeploysTitle": "No data available — no deploys yet",
+      "noDeploysDesc": "Connect a repository to a project and run your first deploy. Nothing is running or completed yet.",
       "deployCtaTitle": "Connect a GitHub repository",
       "deployCtaDesc": "Open Projects, create a project, then use Connect repository in the project header.",
       "deployCtaButton": "Go to projects"
@@ -273,13 +275,22 @@
     },
     "activity": {
       "title": "Activity",
-      "description": "Sample timeline (not wired to the API). For real history use",
-      "deploymentsLink": "Deployments"
+      "description": "Recent deployment events from your organization. Full history in",
+      "deploymentsLink": "Deployments",
+      "loading": "Loading activity…",
+      "empty": "No activity yet — no deploys running or completed.",
+      "deployed": "{project} / {service} is live",
+      "failed": "{project} / {service} failed",
+      "inProgress": "{project} / {service} in progress",
+      "other": "{project} / {service} — {status}"
     },
     "deployTimeline": {
       "title": "Recent deployments",
       "defaultDesc": "Latest activity across every service.",
-      "all": "All"
+      "all": "All",
+      "loading": "Loading deployments…",
+      "empty": "No deployments yet. Connect a repository and deploy from a project.",
+      "emptyAction": "Go to projects"
     }
   },
   "projects": {
@@ -319,7 +330,14 @@
       "repoPlaceholder": "https://github.com/your-org/your-repo",
       "browseGitHub": "Browse on GitHub",
       "pickRepo": "Repository from GitHub",
-      "pickRepoPlaceholder": "Select a repository"
+      "pickRepoPlaceholder": "Select a repository",
+      "analyzeRepo": "Analyze repository",
+      "analyzing": "Analyzing…",
+      "analysisWarnings": "Repository warnings",
+      "analysisHints": "Suggestions",
+      "analysisFailed": "Could not analyze repository",
+      "savedWithWarnings": "Repository saved — review warnings above before deploying.",
+      "recommendedRepos": "Recommended test repositories"
     },
     "detail": {
       "addService": "Add service",
@@ -338,6 +356,10 @@
       "deployNow": "Deploy now",
       "connectRepoFirst": "Connect a repository before deploying",
       "deployNeedsRepo": "Connect a GitHub repository first",
+      "deployConfirmTitle": "Deploy with repository warnings?",
+      "deployConfirmDesc": "This repository may fail during build. You can still deploy, but review the issues below.",
+      "deployAnyway": "Deploy anyway",
+      "deployCancel": "Cancel",
       "servicesCount": "{count} services",
       "missingProject": "Missing project.",
       "loadingProject": "Loading project…",

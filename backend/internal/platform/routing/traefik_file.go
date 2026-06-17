@@ -44,8 +44,8 @@ func WriteUserRouteLegacy(dir, routeID, host, containerName string, port int) er
     %s:
       loadBalancer:
         servers:
-          - url: %s
-`, routeID, yamlQuote(host), routeID, routeID, yamlQuote(fmt.Sprintf("http://%s:%d", containerName, port)))
+          - url: %q
+`, routeID, yamlQuote(host), routeID, routeID, fmt.Sprintf("http://%s:%d", containerName, port))
 	path := filepath.Join(strings.TrimSpace(dir), routeID+".yml")
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(body), 0o644); err != nil {

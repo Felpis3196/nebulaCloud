@@ -68,6 +68,6 @@ func (r DeployRoute) RouteFileBody() string {
     %s:
       loadBalancer:
         servers:
-          - url: %s
-`, r.RouteID, yamlQuote(r.Host), r.RouteID, r.RouteID, yamlQuote(backend))
+          - url: %q
+`, r.RouteID, yamlQuote(r.Host), r.RouteID, r.RouteID, backend)
 }
